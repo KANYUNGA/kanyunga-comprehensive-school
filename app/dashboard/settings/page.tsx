@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Save, School } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
+import { useSchool } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -14,22 +15,45 @@ import {
 import { Input } from '@/components/ui/input'
 
 export default function SettingsPage() {
-  const [schoolName, setSchoolName] = useState(
-    'Kanyunga Comprehensive School',
-  )
+  const { data, updateSchool } = useSchool()
+
+  const [name, setName] = useState('')
+  const [motto, setMotto] = useState('')
+  const [poBox, setPoBox] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentYear, setCurrentYear] = useState('')
+
+  useEffect(() => {
+    setName(data.school.name)
+    setMotto(data.school.motto)
+    setPoBox(data.school.poBox)
+    setEmail(data.school.email)
+    setPhone(data.school.phone)
+    setCurrentTerm(data.school.currentTerm)
+    setCurrentYear(String(data.school.currentYear))
+  }, [data.school])
 
   function handleSave() {
-    alert('School information saved successfully.')
+    updateSchool({
+      name,
+      motto,
+      poBox,
+      email,
+      phone,
+      currentTerm,
+      currentYear: Number(currentYear),
+    })
+
+    alert('School information updated successfully.')
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Manage your school management system settings."
+        description="Manage your school information and academic settings."
       />
 
       <Card>
@@ -50,13 +74,35 @@ export default function SettingsPage() {
 
         <CardContent className="space-y-5">
           <div className="space-y-2">
-            <label htmlFor="schoolName" className="text-sm font-medium">
+            <label htmlFor="name" className="text-sm font-medium">
               School Name
             </label>
             <Input
-              id="schoolName"
-              value={schoolName}
-              onChange={(e) => setSchoolName(e.target.value)}
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="motto" className="text-sm font-medium">
+              School Motto
+            </label>
+            <Input
+              id="motto"
+              value={motto}
+              onChange={(e) => setMotto(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="poBox" className="text-sm font-medium">
+              P.O. Box / Address
+            </label>
+            <Input
+              id="poBox"
+              value={poBox}
+              onChange={(e) => setPoBox(e.target.value)}
             />
           </div>
 
@@ -69,7 +115,6 @@ export default function SettingsPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="school@example.com"
             />
           </div>
 
@@ -81,19 +126,30 @@ export default function SettingsPage() {
               id="phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Enter phone number"
             />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="address" className="text-sm font-medium">
-              Address / Location
+            <label htmlFor="currentTerm" className="text-sm font-medium">
+              Current Term
             </label>
             <Input
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Enter school address or location"
+              id="currentTerm"
+              value={currentTerm}
+              onChange={(e) => setCurrentTerm(e.target.value)}
+              placeholder="e.g. Term 1"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="currentYear" className="text-sm font-medium">
+              Current Year
+            </label>
+            <Input
+              id="currentYear"
+              type="number"
+              value={currentYear}
+              onChange={(e) => setCurrentYear(e.target.value)}
             />
           </div>
 
