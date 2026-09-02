@@ -70,13 +70,11 @@ export default function SubjectsPage() {
       <PageHeader
         title="Subjects"
         description="The subjects offered following the Kenyan curriculum."
-        action={
+        actions={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4" />
-                New Subject
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="size-4" />
+              New Subject
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>

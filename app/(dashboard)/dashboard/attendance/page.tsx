@@ -79,7 +79,7 @@ export default function AttendancePage() {
         <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-end">
           <div className="flex flex-col gap-2">
             <Label htmlFor="att-class">Class</Label>
-            <Select value={classId} onValueChange={(v) => { setClassId(v); setDraft({}) }}>
+            <Select value={classId} onValueChange={(v) => { setClassId(v ?? ''); setDraft({}) }}>
               <SelectTrigger id="att-class" className="w-48">
                 <SelectValue />
               </SelectTrigger>

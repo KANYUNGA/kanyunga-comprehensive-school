@@ -62,8 +62,8 @@ const NAV: NavGroup[] = [
   {
     label: 'Attendance',
     items: [
-      { title: 'Student Attendance', href: '/dashboard/attendance/students', icon: CalendarCheck },
-      { title: 'Teacher Attendance', href: '/dashboard/attendance/teachers', icon: UserCheck },
+      { title: 'Student Attendance', href: '/dashboard/attendance', icon: CalendarCheck },
+      { title: 'Teacher Attendance', href: '/dashboard/teacher-attendance', icon: UserCheck },
     ],
   },
   {
@@ -117,12 +117,14 @@ export function AppSidebar() {
               <SidebarMenu>
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.title}>
-                      <Link href={item.href}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
+                    <SidebarMenuButton
+  render={<Link href={item.href} />}
+  isActive={isActive(item.href)}
+  tooltip={item.title}
+>
+  <item.icon />
+  <span>{item.title}</span>
+</SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

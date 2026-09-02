@@ -82,7 +82,7 @@ export default function StudentsPage() {
               className="pl-9"
             />
           </div>
-          <Select value={classFilter} onValueChange={setClassFilter}>
+          <Select value={classFilter} onValueChange={(value) => setClassFilter(value ?? "")}>
             <SelectTrigger className="sm:w-52">
               <SelectValue placeholder="Filter by class" />
             </SelectTrigger>
@@ -148,12 +148,10 @@ export default function StudentsPage() {
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted">
+  <MoreHorizontal className="h-4 w-4" />
+  <span className="sr-only">Actions</span>
+</DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={() => {

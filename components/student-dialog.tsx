@@ -110,7 +110,7 @@ export function StudentDialog({
               value={draft.classId}
               onValueChange={(v) => {
                 const c = data.classes.find((x) => x.id === v)
-                setDraft((d) => ({ ...d, classId: v, stream: c?.streams[0] ?? '' }))
+                setDraft((d) => ({ ...d, classId: v ?? '', stream: c?.streams[0] ?? '' }))
               }}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -122,7 +122,7 @@ export function StudentDialog({
             </Select>
           </Field>
           <Field label="Stream">
-            <Select value={draft.stream} onValueChange={(v) => set('stream', v)}>
+            <Select value={draft.stream} onValueChange={(v) => set('stream', v ?? '')}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {selectedClass?.streams.map((s) => (

@@ -110,13 +110,11 @@ export default function ExamsPage() {
       <PageHeader
         title="Examination Management"
         description="Create exams, enter marks and view automatically graded results."
-        action={
+        actions={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4" />
-                New Exam
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="size-4" />
+              New Exam
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -134,7 +132,7 @@ export default function ExamsPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="exm-term">Term</Label>
-                  <Select value={term} onValueChange={setTerm}>
+                  <Select value={term} onValueChange={(value) => setTerm(value ?? "")}>
                     <SelectTrigger id="exm-term">
                       <SelectValue />
                     </SelectTrigger>
@@ -196,7 +194,7 @@ export default function ExamsPage() {
               <div className="flex flex-wrap gap-4">
                 <div className="flex flex-col gap-2">
                   <Label>Class</Label>
-                  <Select value={entryClass} onValueChange={(v) => { setEntryClass(v); setDraft({}) }}>
+                  <Select value={entryClass} onValueChange={(v) => { setEntryClass(v ?? ''); setDraft({}) }}>
                     <SelectTrigger className="w-40">
                       <SelectValue />
                     </SelectTrigger>
@@ -211,7 +209,7 @@ export default function ExamsPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Subject</Label>
-                  <Select value={entrySubject} onValueChange={(v) => { setEntrySubject(v); setDraft({}) }}>
+                  <Select value={entrySubject} onValueChange={(v) => { setEntrySubject(v ?? ''); setDraft({}) }}>
                     <SelectTrigger className="w-48">
                       <SelectValue />
                     </SelectTrigger>
@@ -284,7 +282,7 @@ export default function ExamsPage() {
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <Select value={entryClass} onValueChange={setEntryClass}>
+                <Select value={entryClass} onValueChange={(value) => setEntryClass(value ?? "")}>
                   <SelectTrigger className="w-40">
                     <SelectValue />
                   </SelectTrigger>

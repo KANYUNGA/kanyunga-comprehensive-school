@@ -62,13 +62,11 @@ export default function ClassesPage() {
       <PageHeader
         title="Classes & Streams"
         description="Manage class levels, their streams and assigned class teachers."
-        action={
+        actions={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4" />
-                New Class
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="size-4" />
+              New Class
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -95,7 +93,7 @@ export default function ClassesPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="cls-teacher">Class teacher</Label>
-                  <Select value={teacherId} onValueChange={setTeacherId}>
+                  <Select value={teacherId} onValueChange={(value) => setTeacherId(value ?? "")}>
                     <SelectTrigger id="cls-teacher">
                       <SelectValue placeholder="Assign a teacher" />
                     </SelectTrigger>

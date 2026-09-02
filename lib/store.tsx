@@ -1,6 +1,13 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import {
   createSampleData,
   type AttendanceStatus,
@@ -27,9 +34,9 @@ interface DataContextValue {
   login: (user: AuthUser) => void
   logout: () => void
   updateSchool: (info: Partial<SchoolInfo>) => void
-  addStudent: (s: Omit<Student, 'id'>) => void
-  updateStudent: (id: string, patch: Partial<Student>) => void
-  deleteStudent: (id: string) => void
+addStudent: (s: Omit<Student, 'id'>) => Promise<void>
+updateStudent: (id: string, patch: Partial<Student>) => Promise<void>
+deleteStudent: (id: string) => Promise<void>
   addTeacher: (t: Omit<Teacher, 'id'>) => void
   updateTeacher: (id: string, patch: Partial<Teacher>) => void
   deleteTeacher: (id: string) => void
@@ -39,7 +46,7 @@ interface DataContextValue {
   setTeacherAttendance: (date: string, records: { teacherId: string; status: AttendanceStatus }[]) => void
   addExam: (e: Omit<Exam, 'id'>) => void
   saveMarks: (examId: string, entries: { studentId: string; subjectId: string; score: number }[]) => void
-  addPayment: (p: Omit<Payment, 'id'>) => void
+  addPayment: (p: Omit<Payment, 'id'>) => Promise<void>
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -52,6 +59,37 @@ function uid(prefix: string) {
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<SchoolData>(() => createSampleData())
+  useEffect(() => {
+  async function loadData() {
+    try {
+      const [studentsResponse, paymentsResponse] = await Promise.all([
+        fetch('/api/students'),
+        fetch('/api/payments'),
+      ])
+
+      if (!studentsResponse.ok) {
+        throw new Error('Failed to load students')
+      }
+
+      if (!paymentsResponse.ok) {
+        throw new Error('Failed to load payments')
+      }
+
+      const students = await studentsResponse.json()
+      const payments = await paymentsResponse.json()
+
+      setData((current) => ({
+        ...current,
+        students,
+        payments,
+      }))
+    } catch (error) {
+      console.error('Failed to load school data:', error)
+    }
+  }
+
+  loadData()
+}, [])
   const [auth, setAuth] = useState<AuthUser | null>(null)
 
   const value = useMemo<DataContextValue>(
@@ -61,10 +99,80 @@ export function DataProvider({ children }: { children: ReactNode }) {
       login: (user) => setAuth(user),
       logout: () => setAuth(null),
       updateSchool: (info) => setData((d) => ({ ...d, school: { ...d.school, ...info } })),
-      addStudent: (s) => setData((d) => ({ ...d, students: [{ ...s, id: uid('std') }, ...d.students] })),
-      updateStudent: (id, patch) =>
-        setData((d) => ({ ...d, students: d.students.map((s) => (s.id === id ? { ...s, ...patch } : s)) })),
-      deleteStudent: (id) => setData((d) => ({ ...d, students: d.students.filter((s) => s.id !== id) })),
+addStudent: async (s) => {
+  try {
+    const response = await fetch('/api/students', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(s),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to save student')
+    }
+
+    const responseData = await fetch('/api/students')
+
+    if (!responseData.ok) {
+      throw new Error('Failed to reload students')
+    }
+
+    const students = await responseData.json()
+
+    setData((d) => ({
+      ...d,
+      students,
+    }))
+  } catch (error) {
+    console.error('Failed to add student:', error)
+  }
+},
+
+  updateStudent: async (id, patch) => {
+    try {
+      const response = await fetch(`/api/students/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update student')
+      }
+
+      const updated = await response.json()
+
+      setData((d) => ({
+        ...d,
+        students: d.students.map((s) =>
+          s.id === id ? updated : s
+        ),
+      }))
+    } catch (error) {
+      console.error('Failed to update student:', error)
+    }
+  },
+
+  deleteStudent: async (id) => {
+    try {
+      const response = await fetch(`/api/students/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete student')
+      }
+
+      setData((d) => ({
+        ...d,
+        students: d.students.filter((s) => s.id !== id),
+      }))
+    } catch (error) {
+      console.error('Failed to delete student:', error)
+    }
+  },
       addTeacher: (t) => setData((d) => ({ ...d, teachers: [{ ...t, id: uid('tch') }, ...d.teachers] })),
       updateTeacher: (id, patch) =>
         setData((d) => ({ ...d, teachers: d.teachers.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
@@ -98,7 +206,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
           }))
           return { ...d, marks: [...others, ...next] }
         }),
-      addPayment: (p) => setData((d) => ({ ...d, payments: [{ ...p, id: uid('pay') }, ...d.payments] })),
+      addPayment: async (p) => {
+        try {
+          const response = await fetch('/api/payments', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(p),
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to save payment')
+          }
+
+          const responseData = await fetch('/api/payments')
+
+          if (!responseData.ok) {
+            throw new Error('Failed to reload payments')
+          }
+
+          const payments = await responseData.json()
+
+          setData((d) => ({
+            ...d,
+            payments,
+          }))
+        } catch (error) {
+          console.error('Failed to add payment:', error)
+        }
+      },
     }),
     [data, auth],
   )

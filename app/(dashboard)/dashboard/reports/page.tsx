@@ -34,7 +34,7 @@ export default function ReportsPage() {
       <PageHeader
         title="Student Report Forms"
         description="Generate end-of-term report cards with automatic grading."
-        action={
+        actions={
           <Button onClick={() => window.print()} className="print:hidden">
             <Printer className="size-4" />
             Print
@@ -49,7 +49,7 @@ export default function ReportsPage() {
             <Select
               value={classId}
               onValueChange={(v) => {
-                setClassId(v)
+                setClassId(v ?? '')
                 const first = data.students.find((s) => s.classId === v)
                 setStudentId(first?.id ?? '')
               }}
@@ -68,7 +68,7 @@ export default function ReportsPage() {
           </div>
           <div className="flex flex-col gap-2">
             <Label>Student</Label>
-            <Select value={activeStudentId} onValueChange={setStudentId}>
+            <Select value={activeStudentId} onValueChange={(value) => setStudentId(value ?? "")}>
               <SelectTrigger className="w-64">
                 <SelectValue />
               </SelectTrigger>
@@ -83,7 +83,7 @@ export default function ReportsPage() {
           </div>
           <div className="flex flex-col gap-2">
             <Label>Exam</Label>
-            <Select value={examId} onValueChange={setExamId}>
+            <Select value={examId} onValueChange={(value) => setExamId(value ?? "")}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>

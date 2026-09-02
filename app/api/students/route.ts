@@ -1,37 +1,165 @@
-import { NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { sql } from '@/lib/db'
 
 export async function GET() {
   try {
-    const sql = getDb()
-
     const students = await sql`
       SELECT
-        "Id" AS id,
-        "Admission number" AS admission_no,
-        "First name" AS first_name,
-        "Middle name" AS middle_name,
-        "Last name" AS last_name,
-        "Gender" AS gender,
-        "Date of birth" AS date_of_birth,
-        "Class name" AS class_name,
-        "Stream" AS stream,
-        "Parent name" AS parent_name,
-        "Parent phone" AS parent_phone,
-        "Adresss" AS address,
-        "Admission date" AS admission_date,
-        "Status" AS status
-      FROM "Students"
-      ORDER BY "Id" DESC
+        id,
+        admission_number,
+        first_name,
+        middle_name,
+        last_name,
+        gender,
+        date_of_birth,
+        class_name,
+        stream,
+        parent_name,
+        parent_phone,
+        address,
+        admission_date,
+        status,
+        created_at
+      FROM students
+      ORDER BY id
     `
 
-    return NextResponse.json(students)
+    return Response.json(
+      students.map((s) => ({
+        id: String(s.id),
+        admissionNo: s.admission_number ?? '',
+        firstName: s.first_name ?? '',
+        lastName: s.last_name ?? '',
+        gender: s.gender ?? 'Male',
+        classId: s.class_name ?? '',
+        stream: s.stream ?? '',
+dateOfBirth: s.date_of_birth
+  ? new Date(s.date_of_birth).toISOString().slice(0, 10)
+  : '',
+        guardianName: s.parent_name ?? '',
+        guardianPhone: s.parent_phone ?? '',
+        email: '',
+admissionDate: s.admission_date
+  ? new Date(s.admission_date).toISOString().slice(0, 10)
+  : '',
+        status: s.status ?? 'Active',
+      }))
+    )
   } catch (error) {
     console.error('Failed to fetch students:', error)
-
-    return NextResponse.json(
+    return Response.json(
       { error: 'Failed to fetch students' },
-      { status: 500 },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const student = await request.json()
+
+    const result = await sql`
+      INSERT INTO students (
+        admission_number,
+        first_name,
+        last_name,
+        gender,
+        date_of_birth,
+        class_name,
+        stream,
+        parent_name,
+        parent_phone,
+        admission_date,
+        status
+      )
+      VALUES (
+        ${student.admissionNo},
+        ${student.firstName},
+        ${student.lastName},
+        ${student.gender},
+        ${student.dateOfBirth || null},
+        ${student.classId},
+        ${student.stream},
+        ${student.guardianName},
+        ${student.guardianPhone},
+        ${student.admissionDate || null},
+        ${student.status || 'Active'}
+      )
+      RETURNING id
+    `
+
+    return Response.json(
+      { success: true, id: String(result[0].id) },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error('Failed to create student:', error)
+    return Response.json(
+      { error: 'Failed to create student' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const student = await request.json()
+
+    if (!student.id) {
+      return Response.json(
+        { error: 'Student ID is required' },
+        { status: 400 }
+      )
+    }
+
+    await sql`
+      UPDATE students
+      SET
+        admission_number = ${student.admissionNo},
+        first_name = ${student.firstName},
+        last_name = ${student.lastName},
+        gender = ${student.gender},
+        date_of_birth = ${student.dateOfBirth || null},
+        class_name = ${student.classId},
+        stream = ${student.stream},
+        parent_name = ${student.guardianName},
+        parent_phone = ${student.guardianPhone},
+        admission_date = ${student.admissionDate || null},
+        status = ${student.status || 'Active'}
+      WHERE id = ${Number(student.id)}
+    `
+
+    return Response.json({ success: true })
+  } catch (error) {
+    console.error('Failed to update student:', error)
+    return Response.json(
+      { error: 'Failed to update student' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { id } = await request.json()
+
+    if (!id) {
+      return Response.json(
+        { error: 'Student ID is required' },
+        { status: 400 }
+      )
+    }
+
+    await sql`
+      DELETE FROM students
+      WHERE id = ${Number(id)}
+    `
+
+    return Response.json({ success: true })
+  } catch (error) {
+    console.error('Failed to delete student:', error)
+    return Response.json(
+      { error: 'Failed to delete student' },
+      { status: 500 }
     )
   }
 }
