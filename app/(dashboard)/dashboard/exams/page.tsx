@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSchool } from '@/lib/store'
 import { studentName } from '@/lib/data'
 import { getGrade, gradeColor, meanGradeFromPoints } from '@/lib/grading'
@@ -46,6 +46,16 @@ export default function ExamsPage() {
   const [entrySubject, setEntrySubject] = useState('sub-mat')
   const [draft, setDraft] = useState<Record<string, string>>({})
 
+  useEffect(() => {
+    if (data.classes.length === 0) return
+
+    const classExists = data.classes.some((c) => c.id === entryClass)
+    if (!classExists) {
+      setEntryClass(data.classes[0].id)
+      setDraft({})
+    }
+  }, [data.classes, entryClass])
+
   // create exam dialog
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -56,10 +66,15 @@ export default function ExamsPage() {
     [data.subjects],
   )
 
-  const roster = useMemo(
-    () => data.students.filter((s) => s.classId === entryClass && s.status === 'Active'),
-    [data.students, entryClass],
-  )
+  const roster = useMemo(() => {
+    const selectedClass = data.classes.find((c) => c.id === entryClass)
+
+    return data.students.filter(
+      (s) =>
+        s.classId === (selectedClass?.name ?? entryClass) &&
+        s.status === 'Active',
+    )
+  }, [data.students, data.classes, entryClass])
 
   function existingScore(studentId: string) {
     return data.marks.find(

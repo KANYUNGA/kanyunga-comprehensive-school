@@ -341,12 +341,28 @@ export function formatKES(amount: number): string {
 export function feeForStudent(data: SchoolData, studentId: string) {
   const student = data.students.find((s) => s.id === studentId)
   if (!student) return { total: 0, paid: 0, balance: 0 }
-  const structure = data.feeStructures.find(
-    (f) => f.classId === student.classId && f.term === data.school.currentTerm && f.year === data.school.currentYear,
+
+  const fee = data.feeStructures.find(
+    (f) =>
+      f.classId === studentId &&
+      f.term === data.school.currentTerm &&
+      f.year === data.school.currentYear,
   )
-  const total = structure?.amount ?? 0
+
+  const total = fee?.amount ?? 0
+
   const paid = data.payments
-    .filter((p) => p.studentId === studentId && p.term === data.school.currentTerm && p.year === data.school.currentYear)
+    .filter(
+      (p) =>
+        p.studentId === studentId &&
+        p.term === data.school.currentTerm &&
+        p.year === data.school.currentYear,
+    )
     .reduce((sum, p) => sum + p.amount, 0)
-  return { total, paid, balance: Math.max(0, total - paid) }
+
+  return {
+    total,
+    paid,
+    balance: total - paid,
+  }
 }
