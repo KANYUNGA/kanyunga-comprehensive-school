@@ -1,4 +1,6 @@
-import { sql } from '@/lib/db'
+import { getDb } from "@/lib/db"
+
+const sql = getDb()
 
 export async function PUT(
   request: Request,

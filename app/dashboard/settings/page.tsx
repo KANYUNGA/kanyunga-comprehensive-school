@@ -1,5 +1,7 @@
 import { revalidatePath } from 'next/cache'
-import { sql } from '@/lib/db'
+import { getDb } from "@/lib/db"
+
+const sql = getDb()
 
 async function getSchoolSettings() {
   const result = await sql`
