@@ -26,14 +26,14 @@ export default function LoginPage() {
       setError('Please enter your email and password.')
       return
     }
-    if (role === 'admin') {
+    if (role === 'admin' || role === 'teacher') {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          username: 'admin',
+          username: role === 'admin' ? 'admin' : 'teacher1',
           password
         })
       })
@@ -46,7 +46,7 @@ export default function LoginPage() {
       }
 
       login({
-        role: 'admin',
+        role: result.user.role,
         name: result.user.full_name
       })
 
