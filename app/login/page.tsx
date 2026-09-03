@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 export default function LoginPage() {
   const router = useRouter()
   const { data, login } = useSchool()
-  const [role, setRole] = useState<'admin' | 'parent'>('admin')
+  const [role, setRole] = useState<'admin' | 'teacher' | 'parent'>('admin')
   const [email, setEmail] = useState('admin@kanyunga.ac.ke')
   const [password, setPassword] = useState('password')
   const [studentId, setStudentId] = useState(data.students[0]?.id ?? '')
