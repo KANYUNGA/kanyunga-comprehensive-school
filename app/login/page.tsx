@@ -133,7 +133,18 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => {
-                setRole('parent')
+                setRole('teacher')
+        setEmail('teacher1@kanyunga.school')
+        setError('')
+      }}
+    >
+      Teacher
+    </button>
+
+    <button
+      type="button"
+      onClick={() => {
+        setRole('parent')
                 setEmail('parent@example.com')
                 setError('')
               }}
