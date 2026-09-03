@@ -20,36 +20,14 @@ export default function LoginPage() {
   const [studentId, setStudentId] = useState(data.students[0]?.id ?? '')
   const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email || !password) {
       setError('Please enter your email and password.')
       return
     }
     if (role === 'admin') {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: 'admin',
-          password
-        })
-      })
-
-      const result = await response.json()
-
-      if (!result.success) {
-        setError(result.message)
-        return
-      }
-
-      login({
-        role: 'admin',
-        name: result.user.full_name
-      })
-
+      login({ role: 'admin', name: 'Administrator' })
       router.push('/dashboard')
     } else {
       const student = data.students.find((s) => s.id === studentId)
