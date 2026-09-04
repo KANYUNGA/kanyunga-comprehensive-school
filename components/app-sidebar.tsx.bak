@@ -71,13 +71,12 @@ const NAV: NavGroup[] = [
     items: [
       { title: 'Fees Management', href: '/dashboard/fees', icon: CreditCard },
       { title: 'Payments & Balances', href: '/dashboard/payments', icon: Receipt },
-      { title: 'Users', href: '/dashboard/users', icon: UserCheck }, },
     ],
   },
   {
       label: 'System',
         items: [
-            { title: 'Users', href: '/dashboard/users', icon: UserCheck }, },
+            { title: 'Users', href: '/dashboard/users', icon: UserCheck },
                 { title: 'Settings', href: '/dashboard/settings', icon: Settings },
                   ],
                   },
