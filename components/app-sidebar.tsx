@@ -80,7 +80,6 @@ const NAV: NavGroup[] = [
                 { title: 'Settings', href: '/dashboard/settings', icon: Settings },
                   ],
                   },
-  }
 
 export function AppSidebar() {
   const pathname = usePathname()
