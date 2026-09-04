@@ -74,13 +74,9 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-  {
-    label: 'System',
-    items: [
-      { title: 'Users', href: '/dashboard/users', icon: Users },
-      { title: 'Settings', href: '/dashboard/settings', icon: Settings },
-    ],
-  },
+        label: 'System',
+          items: [
+              { title: 'Users', href: '/dashboard/users', icon: Users },
                   { title: 'Settings', href: '/dashboard/settings', icon: Settings },
                     ],
                     },
