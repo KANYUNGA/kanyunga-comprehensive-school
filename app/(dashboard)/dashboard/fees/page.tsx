@@ -10,6 +10,19 @@ import { formatKES, feeForStudent } from "@/lib/data"
 import { useSchool } from "@/lib/store"
 
 export default function FeesPage() {
+  const { auth } = useSchool()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (auth && auth.role !== 'Admin') {
+      router.push('/dashboard')
+    }
+  }, [auth, router])
+
+  if (!auth || auth.role !== 'Admin') {
+    return <div className="p-6 text-red-600 font-medium">Access Denied. Admins only.</div>
+  }
+
   const { data } = useSchool()
 
   const rows = useMemo(() => {

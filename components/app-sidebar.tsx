@@ -85,7 +85,7 @@ const NAV: NavGroup[] = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { data, logout } = useSchool()
+  const { data, logout, auth } = useSchool()
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard'
@@ -113,7 +113,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {NAV.map((group) => (
+        {(auth?.role === 'Admin' ? NAV : NAV.filter(g => g.label !== 'System' && g.label !== 'Finance')).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
