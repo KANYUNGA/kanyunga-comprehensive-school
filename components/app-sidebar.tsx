@@ -80,6 +80,7 @@ const NAV: NavGroup[] = [
                   ],
                   },
 
+]
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -162,4 +163,4 @@ export function AppSidebar() {
       </SidebarFooter>
     </Sidebar>
   )
-}
+}// refresh
