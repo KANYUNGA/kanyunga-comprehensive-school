@@ -74,9 +74,13 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'System',
-    items: [{ title: 'Settings', href: '/dashboard/settings', icon: Settings }],
-  },
+      label: 'System',
+        items: [
+            { title: 'Users', href: '/dashboard/users', icon: UserCheck },
+                { title: 'Settings', href: '/dashboard/settings', icon: Settings },
+                  ],
+                  },
+  }
 ]
 
 export function AppSidebar() {
