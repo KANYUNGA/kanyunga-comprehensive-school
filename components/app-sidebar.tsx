@@ -81,7 +81,6 @@ const NAV: NavGroup[] = [
                   ],
                   },
   }
-]
 
 export function AppSidebar() {
   const pathname = usePathname()
