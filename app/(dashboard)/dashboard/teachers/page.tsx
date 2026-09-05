@@ -26,7 +26,7 @@ import { useSchool } from '@/lib/store'
 import { teacherName, type Teacher } from '@/lib/data'
 
 export default function TeachersPage() {
-  const { data, deleteTeacher } = useSchool()
+  const { data, deleteTeacher, auth } = useSchool()
   const [query, setQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Teacher | null>(null)
@@ -52,14 +52,16 @@ export default function TeachersPage() {
         title="Teachers"
         description="Manage teaching staff and their subject assignments."
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null)
-              setDialogOpen(true)
-            }}
-          >
-            <UserPlus className="h-4 w-4" /> Register Teacher
-          </Button>
+          auth?.role === 'admin' && (
+            <Button
+              onClick={() => {
+                setEditing(null)
+                setDialogOpen(true)
+              }}
+            >
+              <UserPlus className="h-4 w-4" /> Register Teacher
+            </Button>
+          )
         }
       />
 
@@ -85,7 +87,7 @@ export default function TeachersPage() {
                 <TableHead>Phone</TableHead>
                 <TableHead>Subjects</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-10" />
+                {auth?.role === 'admin' && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -114,6 +116,7 @@ export default function TeachersPage() {
                   <TableCell>
                     <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">{t.status}</Badge>
                   </TableCell>
+                  {auth?.role === 'admin' && (
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
@@ -135,6 +138,7 @@ export default function TeachersPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
+                  )}
                 </TableRow>
               ))}
               {filtered.length === 0 && (
@@ -149,7 +153,9 @@ export default function TeachersPage() {
         </div>
       </Card>
 
-      <TeacherDialog open={dialogOpen} onOpenChange={setDialogOpen} teacher={editing} />
+      {auth?.role === 'admin' && (
+        <TeacherDialog open={dialogOpen} onOpenChange={setDialogOpen} teacher={editing} />
+      )}
     </div>
   )
 }

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
+import { createSessionToken } from "@/lib/server-auth"
+
+const COOKIE_NAME = "school_session"
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +40,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    return NextResponse.json({
+    const token = createSessionToken(user.id)
+
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -46,6 +51,18 @@ export async function POST(req: NextRequest) {
         role: user.role
       }
     })
+
+    response.cookies.set({
+      name: COOKIE_NAME,
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 8
+    })
+
+    return response
   } catch (error) {
     console.error(error)
 

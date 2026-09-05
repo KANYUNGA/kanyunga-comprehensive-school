@@ -33,7 +33,7 @@ import { useSchool } from '@/lib/store'
 import { formatKES, feeForStudent, studentName, type Student } from '@/lib/data'
 
 export default function StudentsPage() {
-  const { data, deleteStudent } = useSchool()
+  const { data, deleteStudent, auth } = useSchool()
   const [query, setQuery] = useState('')
   const [classFilter, setClassFilter] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -60,7 +60,7 @@ export default function StudentsPage() {
         title="Students"
         description="Register, search, and manage all enrolled students."
         actions={
-          <Button
+          auth?.role === 'admin' && <Button
             onClick={() => {
               setEditing(null)
               setDialogOpen(true)
@@ -111,7 +111,7 @@ export default function StudentsPage() {
                 <TableHead>Gender</TableHead>
                 <TableHead>Guardian</TableHead>
                 <TableHead>Fee Balance</TableHead>
-                <TableHead className="w-10" />
+                {auth?.role === 'admin' && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -146,6 +146,7 @@ export default function StudentsPage() {
                         <span className="text-sm font-medium text-destructive">{formatKES(fee.balance)}</span>
                       )}
                     </TableCell>
+                    {auth?.role === 'admin' && (
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted">
@@ -167,6 +168,7 @@ export default function StudentsPage() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
+                    )} 
                   </TableRow>
                 )
               })}
@@ -183,7 +185,9 @@ export default function StudentsPage() {
         </div>
       </Card>
 
-      <StudentDialog open={dialogOpen} onOpenChange={setDialogOpen} student={editing} />
+      {auth?.role === 'admin' && (
+        <StudentDialog open={dialogOpen} onOpenChange={setDialogOpen} student={editing} />
+      )}
     </div>
   )
 }

@@ -21,7 +21,7 @@ import {
   type Teacher,
 } from './data'
 
-export type Role = 'admin' | 'parent'
+export type Role = 'admin' | 'teacher' | 'parent'
 export interface AuthUser {
   role: Role
   name: string

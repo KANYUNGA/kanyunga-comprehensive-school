@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db"
+import { requireAdmin } from "@/lib/server-auth"
 
 const sql = getDb()
 
@@ -56,6 +57,9 @@ admissionDate: s.admission_date
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin()
+  if (!auth.authorized) return auth.response
+
   try {
     const student = await request.json()
 
@@ -103,6 +107,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const auth = await requireAdmin()
+  if (!auth.authorized) return auth.response
+
   try {
     const student = await request.json()
 
@@ -141,6 +148,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const auth = await requireAdmin()
+  if (!auth.authorized) return auth.response
+
   try {
     const { id } = await request.json()
 

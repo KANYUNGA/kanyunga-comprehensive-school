@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db"
+import { requireAdmin } from "@/lib/server-auth"
 
 const sql = getDb()
 
@@ -6,6 +7,9 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdmin()
+  if (!auth.authorized) return auth.response
+
   try {
     const { id } = await params
     const student = await request.json()
@@ -90,6 +94,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdmin()
+  if (!auth.authorized) return auth.response
+
   try {
     const { id } = await params
     const studentId = Number(id)
