@@ -128,7 +128,7 @@ export default function LoginPage() {
                 role === 'admin' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <ShieldCheck className="h-4 w-4" /> Administrator
+              <ShieldCheck className="h-4 w-4" /> Admin
             </button>
             <button
               type="button"
