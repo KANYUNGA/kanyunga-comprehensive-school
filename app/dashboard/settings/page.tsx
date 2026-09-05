@@ -1,25 +1,25 @@
+import { revalidatePath } from "next/cache"
+import { getDb } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
-import { revalidatePath } from 'next/cache'
-import { getDb } from "@/lib/db"
 
 const sql = getDb()
 
 async function getSchoolSettings() {
   const result = await sql`
     SELECT
-      "Id" AS id,
-      "School name" AS school_name,
-      "School code" AS school_code,
-      "Address" AS address,
-      "Postal code" AS postal_code,
-      "Town" AS town,
-      "Phone" AS phone,
-      "Email" AS email,
-      "Motto" AS motto,
-      "Logo url" AS logo_url
-    FROM "School settings"
-    ORDER BY "Id"
+      id,
+      school_name,
+      school_code,
+      address,
+      postal_code,
+      town,
+      phone,
+      email,
+      motto,
+      logo_url
+    FROM school_settings
+    ORDER BY id
     LIMIT 1
   `
 
@@ -27,41 +27,41 @@ async function getSchoolSettings() {
 }
 
 async function updateSchoolSettings(formData: FormData) {
-  'use server'
+  "use server"
 
-  const id = formData.get('id')?.toString()
+  const id = formData.get("id")?.toString()
 
   if (!id) {
-    throw new Error('School settings record was not found')
+    throw new Error("School settings record was not found")
   }
 
-  const schoolName = formData.get('schoolName')?.toString() ?? ''
-  const schoolCode = formData.get('schoolCode')?.toString() ?? ''
-  const address = formData.get('address')?.toString() ?? ''
-  const postalCode = formData.get('postalCode')?.toString() ?? ''
-  const town = formData.get('town')?.toString() ?? ''
-  const phone = formData.get('phone')?.toString() ?? ''
-  const email = formData.get('email')?.toString() ?? ''
-  const motto = formData.get('motto')?.toString() ?? ''
-  const logoUrl = formData.get('logoUrl')?.toString() ?? ''
+  const schoolName = formData.get("schoolName")?.toString() ?? ""
+  const schoolCode = formData.get("schoolCode")?.toString() ?? ""
+  const address = formData.get("address")?.toString() ?? ""
+  const postalCode = formData.get("postalCode")?.toString() ?? ""
+  const town = formData.get("town")?.toString() ?? ""
+  const phone = formData.get("phone")?.toString() ?? ""
+  const email = formData.get("email")?.toString() ?? ""
+  const motto = formData.get("motto")?.toString() ?? ""
+  const logoUrl = formData.get("logoUrl")?.toString() ?? ""
 
   await sql`
-    UPDATE "School settings"
+    UPDATE school_settings
     SET
-      "School name" = ${schoolName},
-      "School code" = ${schoolCode},
-      "Address" = ${address},
-      "Postal code" = ${postalCode},
-      "Town" = ${town},
-      "Phone" = ${phone},
-      "Email" = ${email},
-      "Motto" = ${motto},
-      "Logo url" = ${logoUrl},
-      "Updated at" = NOW()
-    WHERE "Id" = ${id}
+      school_name = ${schoolName},
+      school_code = ${schoolCode},
+      address = ${address},
+      postal_code = ${postalCode},
+      town = ${town},
+      phone = ${phone},
+      email = ${email},
+      motto = ${motto},
+      logo_url = ${logoUrl},
+      updated_at = NOW()
+    WHERE id = ${id}
   `
 
-  revalidatePath('/dashboard/settings')
+  revalidatePath("/dashboard/settings")
 }
 
 export default async function SettingsPage() {
@@ -81,7 +81,9 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">School Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          School Settings
+        </h1>
         <p className="text-sm text-muted-foreground">
           Update your school information stored in Neon.
         </p>
@@ -98,7 +100,7 @@ export default async function SettingsPage() {
             <input
               id="schoolName"
               name="schoolName"
-              defaultValue={school.school_name ?? ''}
+              defaultValue={school.school_name ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               required
             />
@@ -111,7 +113,7 @@ export default async function SettingsPage() {
             <input
               id="schoolCode"
               name="schoolCode"
-              defaultValue={school.school_code ?? ''}
+              defaultValue={school.school_code ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -123,7 +125,7 @@ export default async function SettingsPage() {
             <input
               id="phone"
               name="phone"
-              defaultValue={school.phone ?? ''}
+              defaultValue={school.phone ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -135,7 +137,7 @@ export default async function SettingsPage() {
             <input
               id="address"
               name="address"
-              defaultValue={school.address ?? ''}
+              defaultValue={school.address ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -147,7 +149,7 @@ export default async function SettingsPage() {
             <input
               id="postalCode"
               name="postalCode"
-              defaultValue={school.postal_code ?? ''}
+              defaultValue={school.postal_code ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -159,7 +161,7 @@ export default async function SettingsPage() {
             <input
               id="town"
               name="town"
-              defaultValue={school.town ?? ''}
+              defaultValue={school.town ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -172,7 +174,7 @@ export default async function SettingsPage() {
               id="email"
               name="email"
               type="email"
-              defaultValue={school.email ?? ''}
+              defaultValue={school.email ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -184,7 +186,7 @@ export default async function SettingsPage() {
             <input
               id="motto"
               name="motto"
-              defaultValue={school.motto ?? ''}
+              defaultValue={school.motto ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -196,7 +198,7 @@ export default async function SettingsPage() {
             <input
               id="logoUrl"
               name="logoUrl"
-              defaultValue={school.logo_url ?? ''}
+              defaultValue={school.logo_url ?? ""}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               placeholder="https://..."
             />
