@@ -45,10 +45,10 @@ export default function LoginPage() {
         return
       }
 
-      login({
-        role: result.user.role,
-        name: result.user.full_name
-      })
+     login({
+  role: String(result.user.role).toLowerCase() as 'admin' | 'teacher' | 'parent',
+  name: result.user.full_name
+})
 
       router.push('/dashboard')
     } else {
