@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import bcrypt from "bcryptjs"
 import { getDb } from "@/lib/db"
 import { createSessionToken } from "@/lib/server-auth"
 
@@ -6,20 +7,34 @@ const COOKIE_NAME = "school_session"
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, password } = await req.json()
+    const { email, password } = await req.json()
+
+    if (!email || !password) {
+      return NextResponse.json(
+        { success: false, message: "Email and password are required" },
+        { status: 400 }
+      )
+    }
 
     const sql = getDb()
 
     const users = await sql`
-      SELECT id, username, full_name, role, password_hash, status
+      SELECT
+        id,
+        username,
+        full_name,
+        email,
+        role,
+        password_hash,
+        status
       FROM users
-      WHERE username = ${username}
+      WHERE LOWER(email) = LOWER(${email})
       LIMIT 1
     `
 
     if (users.length === 0) {
       return NextResponse.json(
-        { success: false, message: "Invalid username" },
+        { success: false, message: "Invalid email or password" },
         { status: 401 }
       )
     }
@@ -33,9 +48,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (user.password_hash !== password) {
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user.password_hash
+    )
+
+    if (!passwordMatches) {
       return NextResponse.json(
-        { success: false, message: "Invalid password" },
+        { success: false, message: "Invalid email or password" },
         { status: 401 }
       )
     }
@@ -48,6 +68,7 @@ export async function POST(req: NextRequest) {
         id: user.id,
         username: user.username,
         full_name: user.full_name,
+        email: user.email,
         role: user.role
       }
     })
@@ -64,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     return response
   } catch (error) {
-    console.error(error)
+    console.error("Login error:", error)
 
     return NextResponse.json(
       { success: false, message: "Server error" },

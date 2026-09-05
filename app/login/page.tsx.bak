@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useState } from 'react'
@@ -14,8 +15,8 @@ import { cn } from '@/lib/utils'
 export default function LoginPage() {
   const router = useRouter()
   const { data, login } = useSchool()
-  const [role, setRole] = useState<'admin' | 'parent'>('admin')
-  const [email, setEmail] = useState('admin@kanyunga.ac.ke')
+  const [role, setRole] = useState<'admin' | 'teacher' | 'parent'>('admin')
+  const [email, setEmail] = useState('admin@kanyunga.school')
   const [password, setPassword] = useState('password')
   const [studentId, setStudentId] = useState(data.students[0]?.id ?? '')
   const [error, setError] = useState('')
@@ -26,14 +27,14 @@ export default function LoginPage() {
       setError('Please enter your email and password.')
       return
     }
-    if (role === 'admin') {
+    if (role === 'admin' || role === 'teacher') {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          username: 'admin',
+          email,
           password
         })
       })
@@ -45,10 +46,10 @@ export default function LoginPage() {
         return
       }
 
-      login({
-        role: 'admin',
-        name: result.user.full_name
-      })
+     login({
+  role: String(result.user.role).toLowerCase() as 'admin' | 'teacher' | 'parent',
+  name: result.user.full_name
+})
 
       router.push('/dashboard')
     } else {
@@ -128,12 +129,23 @@ export default function LoginPage() {
                 role === 'admin' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <ShieldCheck className="h-4 w-4" /> Administrator
+              <ShieldCheck className="h-4 w-4" /> Admin
             </button>
             <button
               type="button"
               onClick={() => {
-                setRole('parent')
+                setRole('teacher')
+        setEmail('teacher1@kanyunga.school')
+        setError('')
+      }}
+    >
+      Teacher
+    </button>
+
+    <button
+      type="button"
+      onClick={() => {
+        setRole('parent')
                 setEmail('parent@example.com')
                 setError('')
               }}
@@ -174,6 +186,15 @@ export default function LoginPage() {
                   className="pl-9"
                   placeholder="••••••••"
                 />
+              </div>
+
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
               </div>
             </div>
 

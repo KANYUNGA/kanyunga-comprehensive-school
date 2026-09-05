@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useState } from 'react'
@@ -15,7 +16,7 @@ export default function LoginPage() {
   const router = useRouter()
   const { data, login } = useSchool()
   const [role, setRole] = useState<'admin' | 'teacher' | 'parent'>('admin')
-  const [email, setEmail] = useState('admin@kanyunga.ac.ke')
+  const [email, setEmail] = useState('admin@kanyunga.school')
   const [password, setPassword] = useState('password')
   const [studentId, setStudentId] = useState(data.students[0]?.id ?? '')
   const [error, setError] = useState('')
@@ -33,7 +34,7 @@ export default function LoginPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          username: role === 'admin' ? 'admin' : 'teacher1',
+          email,
           password
         })
       })
@@ -186,6 +187,15 @@ export default function LoginPage() {
                   placeholder="••••••••"
                 />
               </div>
+
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             {role === 'parent' && (
@@ -208,7 +218,7 @@ export default function LoginPage() {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            <Button type="submit" className="w-full">
+                <Button type="submit" className="w-full">
               <GraduationCap className="h-4 w-4" /> Sign in
             </Button>
           </form>
