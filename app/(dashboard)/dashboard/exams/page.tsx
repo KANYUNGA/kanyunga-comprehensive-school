@@ -40,7 +40,7 @@ import { ClipboardList, Plus, Trophy } from 'lucide-react'
 const CORE_SUBJECTS = ['sub-eng', 'sub-kis', 'sub-mat', 'sub-bio', 'sub-che', 'sub-his', 'sub-geo', 'sub-bst']
 
 export default function ExamsPage() {
-  const { data, addExam, saveMarks } = useSchool()
+  const { data, addExam, saveMarks, auth } = useSchool()
   const [selectedExam, setSelectedExam] = useState(data.exams[1]?.id ?? data.exams[0]?.id ?? '')
   const [entryClass, setEntryClass] = useState(data.classes[0]?.id ?? '')
   const [entrySubject, setEntrySubject] = useState('sub-mat')
@@ -126,11 +126,12 @@ export default function ExamsPage() {
         title="Examination Management"
         description="Create exams, enter marks and view automatically graded results."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="size-4" />
-              New Exam
-            </DialogTrigger>
+          auth?.role === 'admin' ? (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger render={<Button />}>
+                <Plus className="size-4" />
+                New Exam
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Examination</DialogTitle>
@@ -167,6 +168,7 @@ export default function ExamsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          ) : null
         }
       />
 

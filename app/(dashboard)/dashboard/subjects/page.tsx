@@ -43,7 +43,7 @@ const CATEGORIES: Subject['category'][] = [
 ]
 
 export default function SubjectsPage() {
-  const { data, addSubject } = useSchool()
+  const { data, addSubject, auth } = useSchool()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
@@ -71,11 +71,12 @@ export default function SubjectsPage() {
         title="Subjects"
         description="The subjects offered following the Kenyan curriculum."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="size-4" />
-              New Subject
-            </DialogTrigger>
+          auth?.role === 'admin' ? (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger render={<Button />}>
+                <Plus className="size-4" />
+                New Subject
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Subject</DialogTitle>
@@ -113,6 +114,7 @@ export default function SubjectsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          ) : null
         }
       />
 

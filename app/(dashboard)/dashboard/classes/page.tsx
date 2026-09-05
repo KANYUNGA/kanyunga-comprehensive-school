@@ -27,7 +27,7 @@ import {
 import { GraduationCap, Layers, Plus, Users } from 'lucide-react'
 
 export default function ClassesPage() {
-  const { data, addClass } = useSchool()
+  const { data, addClass, auth } = useSchool()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [streams, setStreams] = useState('')
@@ -63,11 +63,12 @@ export default function ClassesPage() {
         title="Classes & Streams"
         description="Manage class levels, their streams and assigned class teachers."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="size-4" />
-              New Class
-            </DialogTrigger>
+          auth?.role === 'admin' ? (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger render={<Button />}>
+                <Plus className="size-4" />
+                New Class
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Class Level</DialogTitle>
@@ -116,6 +117,7 @@ export default function ClassesPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          ) : null
         }
       />
 

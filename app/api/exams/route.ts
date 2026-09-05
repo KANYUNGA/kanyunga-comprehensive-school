@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db"
+import { requireAdmin } from "@/lib/server-auth"
 
 const sql = getDb()
 
@@ -41,6 +42,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin()
+  if (!auth.authorized) return auth.response
+
   try {
     const examData = await request.json()
 

@@ -15,12 +15,12 @@ export default function FeesPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (auth && auth.role !== 'Admin') {
+    if (auth && auth.role !== 'admin') {
       router.push('/dashboard')
     }
   }, [auth, router])
 
-  if (!auth || auth.role !== 'Admin') {
+  if (!auth || auth.role !== 'admin') {
     return <div className="p-6 text-red-600 font-medium">Access Denied. Admins only.</div>
   }
 
