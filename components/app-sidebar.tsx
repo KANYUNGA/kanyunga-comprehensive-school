@@ -112,7 +112,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {(auth?.role === 'Admin' ? NAV : NAV.filter(g => g.label !== 'System' && g.label !== 'Finance')).map((group) => (
+        {(auth?.role === 'admin' ? NAV : NAV.filter(g => g.label !== 'System' && g.label !== 'Finance')).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
