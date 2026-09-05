@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { CreditCard, Users, Banknote, AlertCircle } from "lucide-react"
 
 import { PageHeader } from "@/components/page-header"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatKES, feeForStudent } from "@/lib/data"

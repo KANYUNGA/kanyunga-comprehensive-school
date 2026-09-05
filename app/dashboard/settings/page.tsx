@@ -1,4 +1,5 @@
-'use client'\nimport { useSchool } from '@/lib/store'\nimport { useRouter } from 'next/navigation'\nimport { useEffect } from 'react'\n\nexport const dynamic = "force-dynamic"
+
+export const dynamic = "force-dynamic"
 import { revalidatePath } from 'next/cache'
 import { getDb } from "@/lib/db"
 
