@@ -34,20 +34,22 @@ import {
 } from '@/components/ui/select'
 import { BookOpen, Plus, Search } from 'lucide-react'
 
-const CATEGORIES: Subject['category'][] = [
-  'Languages',
-  'Mathematics',
-  'Sciences',
-  'Humanities',
-  'Technicals',
-]
+const CATEGORIES = [
+  'Pre-primary',
+  'Lower Primary',
+  'Upper Primary',
+  'Junior School',
+] as const
+
+type SubjectCategory = (typeof CATEGORIES)[number]
 
 export default function SubjectsPage() {
   const { data, addSubject, auth } = useSchool()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
-  const [category, setCategory] = useState<Subject['category']>('Sciences')
+  const [category, setCategory] =
+    useState<SubjectCategory>('Junior School')
   const [search, setSearch] = useState('')
 
   const filteredSubjects = useMemo(() => {
@@ -64,30 +66,26 @@ export default function SubjectsPage() {
   }, [data.subjects, search])
 
   const grouped = useMemo(() => {
-    return CATEGORIES.map((cat) => ({
-      category: cat,
-      subjects: filteredSubjects.filter((s) => s.category === cat),
-    })).filter((g) => g.subjects.length > 0)
+    return CATEGORIES.map((category) => ({
+      category,
+      subjects: filteredSubjects.filter(
+        (subject) => subject.category === category
+      ),
+    }))
   }, [filteredSubjects])
 
-  const uncategorized = useMemo(() => {
-    return filteredSubjects.filter(
-      (s) => !CATEGORIES.includes(s.category)
-    )
-  }, [filteredSubjects])
-
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim() || !code.trim()) return
 
-    addSubject({
+    await addSubject({
       name: name.trim(),
       code: code.trim(),
-      category,
+      category: category as Subject['category'],
     })
 
     setName('')
     setCode('')
-    setCategory('Sciences')
+    setCategory('Junior School')
     setOpen(false)
   }
 
@@ -95,7 +93,7 @@ export default function SubjectsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Subjects"
-        description={`Showing ${filteredSubjects.length} of ${data.subjects.length} subjects offered by the school.`}
+        description={`Showing ${filteredSubjects.length} of ${data.subjects.length} subjects.`}
         actions={
           auth?.role === 'admin' ? (
             <Dialog open={open} onOpenChange={setOpen}>
@@ -116,7 +114,7 @@ export default function SubjectsPage() {
                       id="sub-name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Mathematics"
+                      placeholder="Subject name"
                     />
                   </div>
 
@@ -126,27 +124,27 @@ export default function SubjectsPage() {
                       id="sub-code"
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
-                      placeholder="e.g. 101"
+                      placeholder="Subject code"
                     />
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="sub-cat">Category</Label>
+                    <Label htmlFor="sub-category">Level</Label>
 
                     <Select
                       value={category}
-                      onValueChange={(v) =>
-                        setCategory(v as Subject['category'])
+                      onValueChange={(value) =>
+                        setCategory(value as SubjectCategory)
                       }
                     >
-                      <SelectTrigger id="sub-cat">
-                        <SelectValue />
+                      <SelectTrigger id="sub-category">
+                        <SelectValue placeholder="Select level" />
                       </SelectTrigger>
 
                       <SelectContent>
-                        {CATEGORIES.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
+                        {CATEGORIES.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {item}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -183,115 +181,64 @@ export default function SubjectsPage() {
           />
 
           <Badge variant="secondary" className="whitespace-nowrap">
-            {data.subjects.length} Subjects
+            {data.subjects.length}
           </Badge>
         </div>
       </Card>
 
-      {grouped.map((g) => (
-        <Card key={g.category}>
+      {grouped.map((group) => (
+        <Card key={group.category}>
           <CardContent className="pt-6">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <BookOpen className="size-4" />
+            <div className="mb-4 flex items-center gap-2">
+              <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BookOpen className="size-5" />
               </span>
 
-              <h3 className="font-heading font-semibold">
-                {g.category}
-              </h3>
+              <h2 className="font-heading text-lg font-semibold">
+                {group.category}
+              </h2>
 
               <Badge variant="secondary" className="ml-auto">
-                {g.subjects.length}
+                {group.subjects.length}
               </Badge>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead className="text-right">
-                    Category
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {g.subjects.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">
-                      {s.name}
-                    </TableCell>
-
-                    <TableCell className="font-mono text-muted-foreground">
-                      {s.code}
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      {s.category}
-                    </TableCell>
+            {group.subjects.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Code</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+
+                <TableBody>
+                  {group.subjects.map((subject) => (
+                    <TableRow key={subject.id}>
+                      <TableCell className="font-medium">
+                        {subject.name}
+                      </TableCell>
+
+                      <TableCell className="font-mono text-muted-foreground">
+                        {subject.code}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No subjects in this category.
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}
 
-      {uncategorized.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <BookOpen className="size-4" />
-              </span>
-
-              <h3 className="font-heading font-semibold">
-                Other Subjects
-              </h3>
-
-              <Badge variant="secondary" className="ml-auto">
-                {uncategorized.length}
-              </Badge>
-            </div>
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead className="text-right">
-                    Category
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {uncategorized.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">
-                      {s.name}
-                    </TableCell>
-
-                    <TableCell className="font-mono text-muted-foreground">
-                      {s.code}
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      {s.category || 'Other'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
       {data.subjects.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            No subjects were loaded from the database.
+            No subjects found.
           </CardContent>
         </Card>
       )}
@@ -305,4 +252,4 @@ export default function SubjectsPage() {
       )}
     </div>
   )
-                                   }
+}
