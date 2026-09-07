@@ -1,8 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useSchool } from '@/lib/store'
-import { studentName, type AttendanceStatus } from '@/lib/data'
+import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,45 +25,154 @@ import {
 import { cn } from '@/lib/utils'
 import { CheckCircle2, Clock, UserX } from 'lucide-react'
 
-const TODAY = '2026-08-28'
+type AttendanceStatus = 'Present' | 'Absent' | 'Late'
+
+type Student = {
+  id: string
+  admissionNo: string
+  firstName: string
+  lastName: string
+  gender?: string
+  classId: string
+  stream?: string
+  status?: string
+}
+
+type AttendanceRecord = {
+  studentId: string
+  status: AttendanceStatus
+}
+
 const STATUSES: AttendanceStatus[] = ['Present', 'Absent', 'Late']
 
 export default function AttendancePage() {
-  const { data, setStudentAttendance } = useSchool()
-  const [classId, setClassId] = useState(data.classes[0]?.id ?? '')
-  const [date, setDate] = useState(TODAY)
+  const [students, setStudents] = useState<Student[]>([])
+  const [classes, setClasses] = useState<string[]>([])
+  const [classId, setClassId] = useState('')
+  const [date, setDate] = useState(
+    new Date().toISOString().split('T')[0]
+  )
   const [draft, setDraft] = useState<Record<string, AttendanceStatus>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function loadStudents() {
+      try {
+        setLoading(true)
+        setError('')
+
+        const response = await fetch('/api/students')
+
+        if (!response.ok) {
+          throw new Error('Failed to load students')
+        }
+
+        const result = await response.json()
+
+        const loadedStudents: Student[] = Array.isArray(result)
+          ? result
+          : result.data ?? result.students ?? []
+
+        setStudents(loadedStudents)
+
+        const uniqueClasses = Array.from(
+          new Set(
+            loadedStudents
+              .filter((s) => s.status !== 'Inactive')
+              .map((s) => s.classId)
+              .filter(Boolean)
+          )
+        )
+
+        setClasses(uniqueClasses)
+
+        if (uniqueClasses.length > 0) {
+          setClassId(uniqueClasses[0])
+        }
+      } catch (err) {
+        console.error(err)
+        setError('Unable to load students from the database.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadStudents()
+  }, [])
 
   const roster = useMemo(
-    () => data.students.filter((s) => s.classId === classId && s.status === 'Active'),
-    [data.students, classId],
+    () =>
+      students.filter(
+        (s) =>
+          s.classId === classId &&
+          s.status !== 'Inactive'
+      ),
+    [students, classId]
   )
 
   function statusFor(studentId: string): AttendanceStatus {
-    if (draft[studentId]) return draft[studentId]
-    const existing = data.studentAttendance.find((a) => a.studentId === studentId && a.date === date)
-    return existing?.status ?? 'Present'
+    return draft[studentId] ?? 'Present'
   }
 
   const summary = useMemo(() => {
-    const counts: Record<AttendanceStatus, number> = { Present: 0, Absent: 0, Late: 0 }
-    roster.forEach((s) => {
-      counts[statusFor(s.id)]++
+    const counts: Record<AttendanceStatus, number> = {
+      Present: 0,
+      Absent: 0,
+      Late: 0,
+    }
+
+    roster.forEach((student) => {
+      counts[statusFor(student.id)]++
     })
+
     return counts
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster, draft, date, data.studentAttendance])
+  }, [roster, draft])
 
   function markAll(status: AttendanceStatus) {
     const next: Record<string, AttendanceStatus> = {}
-    roster.forEach((s) => (next[s.id] = status))
+
+    roster.forEach((student) => {
+      next[student.id] = status
+    })
+
     setDraft(next)
   }
 
-  function save() {
-    const records = roster.map((s) => ({ studentId: s.id, status: statusFor(s.id) }))
-    setStudentAttendance(date, records)
-    setDraft({})
+  async function save() {
+    try {
+      setSaving(true)
+      setError('')
+
+      const records: AttendanceRecord[] = roster.map((student) => ({
+        studentId: student.id,
+        status: statusFor(student.id),
+      }))
+
+      const response = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date,
+          records,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save attendance')
+      }
+
+      setDraft({})
+      alert('Attendance saved successfully.')
+    } catch (err) {
+      console.error(err)
+      setError('Unable to save attendance.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -75,38 +182,74 @@ export default function AttendancePage() {
         description="Mark and review daily student attendance per class."
       />
 
+      {error && (
+        <Card>
+          <CardContent className="pt-6 text-sm text-destructive">
+            {error}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-end">
           <div className="flex flex-col gap-2">
             <Label htmlFor="att-class">Class</Label>
-            <Select value={classId} onValueChange={(v) => { setClassId(v ?? ''); setDraft({}) }}>
+
+            <Select
+              value={classId}
+              onValueChange={(value) => {
+                setClassId(value)
+                setDraft({})
+              }}
+            >
               <SelectTrigger id="att-class" className="w-48">
-                <SelectValue />
+                <SelectValue placeholder="Select class" />
               </SelectTrigger>
+
               <SelectContent>
-                {data.classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                {classes.map((className) => (
+                  <SelectItem
+                    key={className}
+                    value={className}
+                  >
+                    {className}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="att-date">Date</Label>
+
             <Input
               id="att-date"
               type="date"
               value={date}
-              onChange={(e) => { setDate(e.target.value); setDraft({}) }}
+              onChange={(e) => {
+                setDate(e.target.value)
+                setDraft({})
+              }}
               className="w-44"
             />
           </div>
+
           <div className="flex flex-1 flex-wrap items-center gap-2 md:justify-end">
-            <Button variant="outline" size="sm" onClick={() => markAll('Present')}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAll('Present')}
+              disabled={roster.length === 0}
+            >
               Mark all present
             </Button>
-            <Button variant="outline" size="sm" onClick={() => markAll('Absent')}>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAll('Absent')}
+              disabled={roster.length === 0}
+            >
               Mark all absent
             </Button>
           </div>
@@ -114,63 +257,116 @@ export default function AttendancePage() {
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryTile icon={CheckCircle2} label="Present" value={summary.Present} tone="present" />
-        <SummaryTile icon={Clock} label="Late" value={summary.Late} tone="late" />
-        <SummaryTile icon={UserX} label="Absent" value={summary.Absent} tone="absent" />
+        <SummaryTile
+          icon={CheckCircle2}
+          label="Present"
+          value={summary.Present}
+          tone="present"
+        />
+
+        <SummaryTile
+          icon={Clock}
+          label="Late"
+          value={summary.Late}
+          tone="late"
+        />
+
+        <SummaryTile
+          icon={UserX}
+          label="Absent"
+          value={summary.Absent}
+          tone="absent"
+        />
       </div>
 
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Adm No.</TableHead>
-                <TableHead>Student</TableHead>
-                <TableHead>Stream</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roster.map((s) => {
-                const current = statusFor(s.id)
-                return (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono text-muted-foreground">{s.admissionNo}</TableCell>
-                    <TableCell className="font-medium">{studentName(s)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{s.stream}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1.5">
-                        {STATUSES.map((st) => (
-                          <button
-                            key={st}
-                            type="button"
-                            onClick={() => setDraft((d) => ({ ...d, [s.id]: st }))}
-                            className={cn(
-                              'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
-                              current === st
-                                ? st === 'Present'
-                                  ? 'border-transparent bg-primary text-primary-foreground'
-                                  : st === 'Late'
-                                    ? 'border-transparent bg-amber-500 text-white'
-                                    : 'border-transparent bg-destructive text-white'
-                                : 'border-border bg-background text-muted-foreground hover:bg-muted',
-                            )}
-                          >
-                            {st}
-                          </button>
-                        ))}
-                      </div>
-                    </TableCell>
+          {loading ? (
+            <p className="py-8 text-center text-muted-foreground">
+              Loading students...
+            </p>
+          ) : roster.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground">
+              No students found in this class.
+            </p>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Adm No.</TableHead>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Stream</TableHead>
+                    <TableHead className="text-right">
+                      Status
+                    </TableHead>
                   </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-          <div className="mt-4 flex justify-end">
-            <Button onClick={save}>Save Attendance</Button>
-          </div>
+                </TableHeader>
+
+                <TableBody>
+                  {roster.map((student) => {
+                    const current = statusFor(student.id)
+
+                    return (
+                      <TableRow key={student.id}>
+                        <TableCell className="font-mono text-muted-foreground">
+                          {student.admissionNo}
+                        </TableCell>
+
+                        <TableCell className="font-medium">
+                          {student.firstName} {student.lastName}
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge variant="outline">
+                            {student.stream || '—'}
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex justify-end gap-1.5">
+                            {STATUSES.map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() =>
+                                  setDraft((currentDraft) => ({
+                                    ...currentDraft,
+                                    [student.id]: status,
+                                  }))
+                                }
+                                className={cn(
+                                  'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                                  current === status
+                                    ? status === 'Present'
+                                      ? 'border-transparent bg-primary text-primary-foreground'
+                                      : status === 'Late'
+                                        ? 'border-transparent bg-amber-500 text-white'
+                                        : 'border-transparent bg-destructive text-white'
+                                    : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                                )}
+                              >
+                                {status}
+                              </button>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+
+              <div className="mt-4 flex justify-end">
+                <Button
+                  onClick={save}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving...' : 'Save Attendance'}
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -194,17 +390,26 @@ function SummaryTile({
       : tone === 'late'
         ? 'bg-amber-500/10 text-amber-600'
         : 'bg-destructive/10 text-destructive'
+
   return (
     <Card>
       <CardContent className="flex items-center gap-3 pt-6">
-        <span className={cn('flex size-10 items-center justify-center rounded-lg', toneClass)}>
+        <span
+          className={cn(
+            'flex size-10 items-center justify-center rounded-lg',
+            toneClass
+          )}
+        >
           <Icon className="size-5" />
         </span>
+
         <div>
           <p className="text-2xl font-semibold">{value}</p>
-          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-sm text-muted-foreground">
+            {label}
+          </p>
         </div>
       </CardContent>
     </Card>
   )
-}
+            }
