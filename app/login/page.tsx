@@ -1,3 +1,4 @@
+```tsx
 'use client'
 
 import Link from 'next/link'
@@ -23,20 +24,22 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
     if (!email || !password) {
       setError('Please enter your email and password.')
       return
     }
+
     if (role === 'admin' || role === 'teacher') {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           email,
-          password
-        })
+          password,
+        }),
       })
 
       const result = await response.json()
@@ -46,19 +49,29 @@ export default function LoginPage() {
         return
       }
 
-     login({
-  role: String(result.user.role).toLowerCase() as 'admin' | 'teacher' | 'parent',
-  name: result.user.full_name
-})
+      login({
+        role: String(result.user.role).toLowerCase() as
+          | 'admin'
+          | 'teacher'
+          | 'parent',
+        name: result.user.full_name,
+      })
 
       router.push('/dashboard')
     } else {
       const student = data.students.find((s) => s.id === studentId)
+
       if (!student) {
         setError('Please select a student to continue.')
         return
       }
-      login({ role: 'parent', name: student.guardianName, studentId })
+
+      login({
+        role: 'parent',
+        name: student.guardianName,
+        studentId,
+      })
+
       router.push('/parent')
     }
   }
@@ -68,10 +81,21 @@ export default function LoginPage() {
       {/* Brand panel */}
       <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex">
         <div className="flex items-center gap-3">
-          <Image src="/school-crest.png" alt="School crest" width={48} height={48} className="h-12 w-12 object-contain" />
+          <Image
+            src="/school-crest.png"
+            alt="School crest"
+            width={48}
+            height={48}
+            className="h-12 w-12 object-contain"
+          />
+
           <div>
-            <p className="font-heading text-lg font-bold leading-tight">Kanyunga</p>
-            <p className="text-sm text-sidebar-foreground/70">Comprehensive School</p>
+            <p className="font-heading text-lg font-bold leading-tight">
+              Kanyunga
+            </p>
+            <p className="text-sm text-sidebar-foreground/70">
+              Comprehensive School
+            </p>
           </div>
         </div>
 
@@ -79,9 +103,12 @@ export default function LoginPage() {
           <h1 className="text-balance font-heading text-4xl font-bold leading-tight">
             School Management System
           </h1>
+
           <p className="mt-4 text-pretty leading-relaxed text-sidebar-foreground/75">
-            A secure, all-in-one platform for managing students, teachers, attendance, examinations, and school fees.
+            A secure, all-in-one platform for managing students, teachers,
+            attendance, examinations, and school fees.
           </p>
+
           <ul className="mt-8 space-y-3 text-sm text-sidebar-foreground/80">
             {[
               'Real-time attendance & performance tracking',
@@ -98,7 +125,10 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="text-xs text-sidebar-foreground/50">Education for Excellence • Est. 1998</p>
+        <p className="text-xs text-sidebar-foreground/50">
+          Education for Excellence • Est. 1998
+        </p>
+
         <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-sidebar-primary/20 blur-2xl" />
       </aside>
 
@@ -106,17 +136,31 @@ export default function LoginPage() {
       <section className="flex w-full flex-col items-center justify-center px-6 py-12 lg:w-1/2">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-            <Image src="/school-crest.png" alt="School crest" width={56} height={56} className="h-14 w-14 object-contain" />
-            <h2 className="mt-3 font-heading text-xl font-bold">Kanyunga Comprehensive School</h2>
+            <Image
+              src="/school-crest.png"
+              alt="School crest"
+              width={56}
+              height={56}
+              className="h-14 w-14 object-contain"
+            />
+
+            <h2 className="mt-3 font-heading text-xl font-bold">
+              Kanyunga Comprehensive School
+            </h2>
           </div>
 
           <div className="mb-6">
-            <h2 className="font-heading text-2xl font-bold text-foreground">Welcome back</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Sign in to access your portal.</p>
+            <h2 className="font-heading text-2xl font-bold text-foreground">
+              Welcome back
+            </h2>
+
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sign in to access your portal.
+            </p>
           </div>
 
           {/* Role selector */}
-          <div className="mb-6 grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
+          <div className="mb-6 grid grid-cols-3 gap-2 rounded-lg bg-muted p-1">
             <button
               type="button"
               onClick={() => {
@@ -126,43 +170,59 @@ export default function LoginPage() {
               }}
               className={cn(
                 'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition',
-                role === 'admin' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                role === 'admin'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <ShieldCheck className="h-4 w-4" /> Admin
+              <ShieldCheck className="h-4 w-4" />
+              Admin
             </button>
+
             <button
               type="button"
               onClick={() => {
                 setRole('teacher')
-        setEmail('teacher1@kanyunga.school')
-        setError('')
-      }}
-    >
-      Teacher
-    </button>
+                setEmail('teacher1@kanyunga.school')
+                setError('')
+              }}
+              className={cn(
+                'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition',
+                role === 'teacher'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <GraduationCap className="h-4 w-4" />
+              Teacher
+            </button>
 
-    <button
-      type="button"
-      onClick={() => {
-        setRole('parent')
+            <button
+              type="button"
+              onClick={() => {
+                setRole('parent')
                 setEmail('parent@example.com')
                 setError('')
               }}
               className={cn(
                 'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition',
-                role === 'parent' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                role === 'parent'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <Users className="h-4 w-4" /> Parent
+              <Users className="h-4 w-4" />
+              Parent
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
+
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
                 <Input
                   id="email"
                   type="email"
@@ -176,8 +236,10 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
+
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
                 <Input
                   id="password"
                   type="password"
@@ -200,7 +262,8 @@ export default function LoginPage() {
 
             {role === 'parent' && (
               <div className="space-y-2">
-                <Label htmlFor="student">Select your child (demo)</Label>
+                <Label htmlFor="student">Select your child</Label>
+
                 <select
                   id="student"
                   value={studentId}
@@ -216,18 +279,20 @@ export default function LoginPage() {
               </div>
             )}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <p className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
 
-                <Button type="submit" className="w-full">
-              <GraduationCap className="h-4 w-4" /> Sign in
+            <Button type="submit" className="w-full">
+              <GraduationCap className="h-4 w-4" />
+              Sign in
             </Button>
           </form>
-
-          <p className="mt-6 rounded-lg border border-border bg-muted/50 p-3 text-center text-xs text-muted-foreground">
-            Demo credentials are pre-filled. Just click <span className="font-medium text-foreground">Sign in</span>.
-          </p>
         </div>
       </section>
     </main>
   )
 }
+```
