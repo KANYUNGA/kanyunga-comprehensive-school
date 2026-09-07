@@ -29,28 +29,37 @@ export async function GET() {
     return Response.json(
       students.map((s) => ({
         id: String(s.id),
-        admissionNo: s.admission_number ?? '',
-        firstName: s.first_name ?? '',
-        lastName: s.last_name ?? '',
-        gender: s.gender ?? 'Male',
-        classId: s.class_name ?? '',
-        stream: s.stream ?? '',
-dateOfBirth: s.date_of_birth
-  ? new Date(s.date_of_birth).toISOString().slice(0, 10)
-  : '',
-        guardianName: s.parent_name ?? '',
-        guardianPhone: s.parent_phone ?? '',
-        email: '',
-admissionDate: s.admission_date
-  ? new Date(s.admission_date).toISOString().slice(0, 10)
-  : '',
-        status: s.status ?? 'Active',
+        admissionNo: s.admission_number ?? "",
+        firstName: s.first_name ?? "",
+        lastName: s.last_name ?? "",
+        gender: s.gender ?? "Male",
+
+        // IMPORTANT:
+        // Neon stores the actual class name here.
+        classId: s.class_name ?? "",
+
+        stream: s.stream ?? "",
+
+        dateOfBirth: s.date_of_birth
+          ? new Date(s.date_of_birth).toISOString().slice(0, 10)
+          : "",
+
+        guardianName: s.parent_name ?? "",
+        guardianPhone: s.parent_phone ?? "",
+        email: "",
+
+        admissionDate: s.admission_date
+          ? new Date(s.admission_date).toISOString().slice(0, 10)
+          : "",
+
+        status: s.status ?? "Active",
       }))
     )
   } catch (error) {
-    console.error('Failed to fetch students:', error)
+    console.error("Failed to fetch students:", error)
+
     return Response.json(
-      { error: 'Failed to fetch students' },
+      { error: "Failed to fetch students" },
       { status: 500 }
     )
   }
@@ -58,10 +67,27 @@ admissionDate: s.admission_date
 
 export async function POST(request: Request) {
   const auth = await requireAdmin()
-  if (!auth.authorized) return auth.response
+
+  if (!auth.authorized) {
+    return auth.response
+  }
 
   try {
     const student = await request.json()
+
+    // Accept className from the new StudentDialog.
+    // Keep classId as a fallback for older code.
+    const className =
+      student.className?.toString().trim() ||
+      student.classId?.toString().trim() ||
+      ""
+
+    if (!className) {
+      return Response.json(
+        { error: "Class is required" },
+        { status: 400 }
+      )
+    }
 
     const result = await sql`
       INSERT INTO students (
@@ -83,24 +109,29 @@ export async function POST(request: Request) {
         ${student.lastName},
         ${student.gender},
         ${student.dateOfBirth || null},
-        ${student.classId},
-        ${student.stream},
-        ${student.guardianName},
-        ${student.guardianPhone},
+        ${className},
+        ${student.stream || ""},
+        ${student.guardianName || ""},
+        ${student.guardianPhone || ""},
         ${student.admissionDate || null},
-        ${student.status || 'Active'}
+        ${student.status || "Active"}
       )
       RETURNING id
     `
 
     return Response.json(
-      { success: true, id: String(result[0].id) },
+      {
+        success: true,
+        id: String(result[0].id),
+        className,
+      },
       { status: 201 }
     )
   } catch (error) {
-    console.error('Failed to create student:', error)
+    console.error("Failed to create student:", error)
+
     return Response.json(
-      { error: 'Failed to create student' },
+      { error: "Failed to create student" },
       { status: 500 }
     )
   }
@@ -108,14 +139,30 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   const auth = await requireAdmin()
-  if (!auth.authorized) return auth.response
+
+  if (!auth.authorized) {
+    return auth.response
+  }
 
   try {
     const student = await request.json()
 
     if (!student.id) {
       return Response.json(
-        { error: 'Student ID is required' },
+        { error: "Student ID is required" },
+        { status: 400 }
+      )
+    }
+
+    // Accept className from StudentDialog.
+    const className =
+      student.className?.toString().trim() ||
+      student.classId?.toString().trim() ||
+      ""
+
+    if (!className) {
+      return Response.json(
+        { error: "Class is required" },
         { status: 400 }
       )
     }
@@ -128,20 +175,24 @@ export async function PUT(request: Request) {
         last_name = ${student.lastName},
         gender = ${student.gender},
         date_of_birth = ${student.dateOfBirth || null},
-        class_name = ${student.classId},
-        stream = ${student.stream},
-        parent_name = ${student.guardianName},
-        parent_phone = ${student.guardianPhone},
+        class_name = ${className},
+        stream = ${student.stream || ""},
+        parent_name = ${student.guardianName || ""},
+        parent_phone = ${student.guardianPhone || ""},
         admission_date = ${student.admissionDate || null},
-        status = ${student.status || 'Active'}
+        status = ${student.status || "Active"}
       WHERE id = ${Number(student.id)}
     `
 
-    return Response.json({ success: true })
+    return Response.json({
+      success: true,
+      className,
+    })
   } catch (error) {
-    console.error('Failed to update student:', error)
+    console.error("Failed to update student:", error)
+
     return Response.json(
-      { error: 'Failed to update student' },
+      { error: "Failed to update student" },
       { status: 500 }
     )
   }
@@ -149,14 +200,17 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   const auth = await requireAdmin()
-  if (!auth.authorized) return auth.response
+
+  if (!auth.authorized) {
+    return auth.response
+  }
 
   try {
     const { id } = await request.json()
 
     if (!id) {
       return Response.json(
-        { error: 'Student ID is required' },
+        { error: "Student ID is required" },
         { status: 400 }
       )
     }
@@ -168,9 +222,10 @@ export async function DELETE(request: Request) {
 
     return Response.json({ success: true })
   } catch (error) {
-    console.error('Failed to delete student:', error)
+    console.error("Failed to delete student:", error)
+
     return Response.json(
-      { error: 'Failed to delete student' },
+      { error: "Failed to delete student" },
       { status: 500 }
     )
   }
