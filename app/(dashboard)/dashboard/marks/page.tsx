@@ -12,6 +12,7 @@ type Student = {
   lastName: string
   classId: string
   stream: string
+  status?: string
 }
 
 type Subject = {
@@ -37,13 +38,6 @@ type Mark = {
   score: number
 }
 
-const LEVELS = [
-  "Pre-primary",
-  "Lower Primary",
-  "Upper Primary",
-  "Junior School",
-]
-
 export default function MarksPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
@@ -59,44 +53,85 @@ export default function MarksPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
 
+  async function loadData() {
+    try {
+      setLoading(true)
+      setMessage("")
+
+      const [
+        studentsResponse,
+        subjectsResponse,
+        examsResponse,
+        marksResponse,
+      ] = await Promise.all([
+        fetch("/api/students", { cache: "no-store" }),
+        fetch("/api/subjects", { cache: "no-store" }),
+        fetch("/api/exams", { cache: "no-store" }),
+        fetch("/api/marks", { cache: "no-store" }),
+      ])
+
+      if (!studentsResponse.ok) {
+        throw new Error("Failed to load students")
+      }
+
+      const studentsData = await studentsResponse.json()
+      const subjectsData = await subjectsResponse.json()
+      const examsData = await examsResponse.json()
+      const marksData = await marksResponse.json()
+
+      const loadedStudents = Array.isArray(studentsData)
+        ? studentsData
+        : studentsData.data ?? studentsData.students ?? []
+
+      setStudents(loadedStudents)
+      setSubjects(Array.isArray(subjectsData) ? subjectsData : [])
+      setExams(Array.isArray(examsData) ? examsData : [])
+      setMarks(Array.isArray(marksData) ? marksData : [])
+
+      if (
+        selectedClass &&
+        !loadedStudents.some(
+          (student: Student) => student.classId === selectedClass
+        )
+      ) {
+        setSelectedClass("")
+        setSelectedSubject("")
+      }
+    } catch (error) {
+      console.error("Failed to load marks data:", error)
+      setMessage("Failed to load students and marks data.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [
-          studentsResponse,
-          subjectsResponse,
-          examsResponse,
-          marksResponse,
-        ] = await Promise.all([
-          fetch("/api/students"),
-          fetch("/api/subjects"),
-          fetch("/api/exams"),
-          fetch("/api/marks"),
-        ])
+    loadData()
 
-        const studentsData = await studentsResponse.json()
-        const subjectsData = await subjectsResponse.json()
-        const examsData = await examsResponse.json()
-        const marksData = await marksResponse.json()
-
-        setStudents(Array.isArray(studentsData) ? studentsData : [])
-        setSubjects(Array.isArray(subjectsData) ? subjectsData : [])
-        setExams(Array.isArray(examsData) ? examsData : [])
-        setMarks(Array.isArray(marksData) ? marksData : [])
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setLoading(false)
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        loadData()
       }
     }
 
-    loadData()
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    )
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      )
+    }
   }, [])
 
   const classes = useMemo(() => {
     return Array.from(
       new Set(
         students
+          .filter((student) => student.status !== "Inactive")
           .map((student) => student.classId)
           .filter(Boolean)
       )
@@ -111,9 +146,10 @@ export default function MarksPage() {
     let level = ""
 
     if (
-      className.includes("pp") ||
+      className.includes("play") ||
+      className.includes("pp1") ||
+      className.includes("pp2") ||
       className.includes("pre-primary") ||
-      className.includes("baby") ||
       className.includes("pre primary")
     ) {
       level = "Pre-primary"
@@ -131,6 +167,13 @@ export default function MarksPage() {
       className.includes("upper")
     ) {
       level = "Upper Primary"
+    } else if (
+      className.includes("grade 7") ||
+      className.includes("grade 8") ||
+      className.includes("grade 9") ||
+      className.includes("junior")
+    ) {
+      level = "Junior School"
     } else {
       level = "Junior School"
     }
@@ -144,7 +187,9 @@ export default function MarksPage() {
     if (!selectedClass) return []
 
     return students.filter(
-      (student) => student.classId === selectedClass
+      (student) =>
+        student.classId === selectedClass &&
+        student.status !== "Inactive"
     )
   }, [students, selectedClass])
 
@@ -161,7 +206,8 @@ export default function MarksPage() {
         String(mark.examId) === String(selectedExam) &&
         String(mark.subjectId) === String(selectedSubject)
       ) {
-        existingScores[String(mark.studentId)] = String(mark.score)
+        existingScores[String(mark.studentId)] =
+          String(mark.score)
       }
     })
 
@@ -179,13 +225,8 @@ export default function MarksPage() {
 
     const number = Number(value)
 
-    if (number < 0) {
-      value = "0"
-    }
-
-    if (number > 100) {
-      value = "100"
-    }
+    if (number < 0) value = "0"
+    if (number > 100) value = "100"
 
     setScores((current) => ({
       ...current,
@@ -210,7 +251,11 @@ export default function MarksPage() {
     }
 
     const entries = filteredStudents
-      .filter((student) => scores[student.id] !== undefined && scores[student.id] !== "")
+      .filter(
+        (student) =>
+          scores[student.id] !== undefined &&
+          scores[student.id] !== ""
+      )
       .map((student) => ({
         studentId: student.id,
         subjectId: selectedSubject,
@@ -240,18 +285,25 @@ export default function MarksPage() {
       const result = await response.json()
 
       if (!response.ok) {
-        setMessage(result.error || "Failed to save marks.")
+        setMessage(
+          result.error || "Failed to save marks."
+        )
         return
       }
 
       setMessage("Marks saved successfully.")
 
-      const refreshed = await fetch("/api/marks")
+      const refreshed = await fetch("/api/marks", {
+        cache: "no-store",
+      })
+
       const refreshedMarks = await refreshed.json()
 
       if (Array.isArray(refreshedMarks)) {
         setMarks(refreshedMarks)
       }
+
+      await loadData()
     } catch (error) {
       console.error(error)
       setMessage("Failed to save marks.")
@@ -294,13 +346,19 @@ export default function MarksPage() {
                     onChange={(e) => {
                       setSelectedClass(e.target.value)
                       setSelectedSubject("")
+                      setScores({})
                     }}
                     className="w-full rounded-md border bg-background p-2"
                   >
-                    <option value="">Select class</option>
+                    <option value="">
+                      Select class
+                    </option>
 
                     {classes.map((className) => (
-                      <option key={className} value={className}>
+                      <option
+                        key={className}
+                        value={className}
+                      >
                         {className}
                       </option>
                     ))}
@@ -314,16 +372,23 @@ export default function MarksPage() {
 
                   <select
                     value={selectedExam}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setSelectedExam(e.target.value)
-                    }
+                      setScores({})
+                    }}
                     className="w-full rounded-md border bg-background p-2"
                   >
-                    <option value="">Select exam</option>
+                    <option value="">
+                      Select exam
+                    </option>
 
                     {exams.map((exam) => (
-                      <option key={exam.id} value={exam.id}>
-                        {exam.name} - {exam.term} {exam.year}
+                      <option
+                        key={exam.id}
+                        value={exam.id}
+                      >
+                        {exam.name} - {exam.term}{" "}
+                        {exam.year}
                       </option>
                     ))}
                   </select>
@@ -336,9 +401,9 @@ export default function MarksPage() {
 
                   <select
                     value={selectedSubject}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setSelectedSubject(e.target.value)
-                    }
+                    }}
                     className="w-full rounded-md border bg-background p-2"
                     disabled={!selectedClass}
                   >
@@ -348,19 +413,31 @@ export default function MarksPage() {
                         : "Select class first"}
                     </option>
 
-                    {filteredSubjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>
-                        {subject.name} ({subject.code})
-                      </option>
-                    ))}
+                    {filteredSubjects.map(
+                      (subject) => (
+                        <option
+                          key={subject.id}
+                          value={subject.id}
+                        >
+                          {subject.name} (
+                          {subject.code})
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
               </div>
 
               {selectedClass && (
                 <div className="mt-4 rounded-md border p-3 text-sm">
-                  <strong>{filteredSubjects.length}</strong>{" "}
-                  subjects available for this class.
+                  <strong>
+                    {filteredStudents.length}
+                  </strong>{" "}
+                  students in this class and{" "}
+                  <strong>
+                    {filteredSubjects.length}
+                  </strong>{" "}
+                  subjects available.
                 </div>
               )}
             </CardContent>
@@ -414,7 +491,10 @@ export default function MarksPage() {
 
                           <tbody>
                             {filteredStudents.map(
-                              (student, index) => (
+                              (
+                                student,
+                                index
+                              ) => (
                                 <tr
                                   key={student.id}
                                   className="border-b"
@@ -424,16 +504,25 @@ export default function MarksPage() {
                                   </td>
 
                                   <td className="p-3">
-                                    {student.admissionNo}
+                                    {
+                                      student.admissionNo
+                                    }
                                   </td>
 
                                   <td className="p-3 font-medium">
-                                    {student.firstName}{" "}
-                                    {student.lastName}
+                                    {
+                                      student.firstName
+                                    }{" "}
+                                    {
+                                      student.lastName
+                                    }
                                   </td>
 
                                   <td className="p-3">
-                                    {student.stream || "-"}
+                                    {
+                                      student.stream ||
+                                      "-"
+                                    }
                                   </td>
 
                                   <td className="p-3">
@@ -442,13 +531,15 @@ export default function MarksPage() {
                                       min="0"
                                       max="100"
                                       value={
-                                        scores[student.id] ??
-                                        ""
+                                        scores[
+                                          student.id
+                                        ] ?? ""
                                       }
                                       onChange={(e) =>
                                         updateScore(
                                           student.id,
-                                          e.target.value
+                                          e.target
+                                            .value
                                         )
                                       }
                                       className="w-24 rounded-md border bg-background p-2"
@@ -486,4 +577,4 @@ export default function MarksPage() {
       )}
     </div>
   )
-  }
+}
