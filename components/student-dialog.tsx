@@ -19,18 +19,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useSchool } from '@/lib/store'
 import type { Gender, Student } from '@/lib/data'
 
 type Draft = Omit<Student, 'id'>
 
-const empty = (classId: string, stream: string): Draft => ({
+const SCHOOL_CLASSES = [
+  'Play Group',
+  'PP1',
+  'PP2',
+  'Grade 1',
+  'Grade 2',
+  'Grade 3',
+  'Grade 4',
+  'Grade 5',
+  'Grade 6',
+  'Grade 7',
+  'Grade 8',
+  'Grade 9',
+]
+
+const CLASS_STREAMS: Record<string, string[]> = {
+  'Play Group': ['Main'],
+  PP1: ['Main'],
+  PP2: ['Main'],
+  'Grade 1': ['Main'],
+  'Grade 2': ['Main'],
+  'Grade 3': ['Main'],
+  'Grade 4': ['Main'],
+  'Grade 5': ['Main'],
+  'Grade 6': ['Main'],
+  'Grade 7': ['Main'],
+  'Grade 8': ['Main'],
+  'Grade 9': ['Main'],
+}
+
+const empty = (className: string): Draft => ({
   admissionNo: '',
   firstName: '',
   lastName: '',
   gender: 'Male',
-  classId,
-  stream,
+  classId: className,
+  stream: CLASS_STREAMS[className]?.[0] ?? 'Main',
   dateOfBirth: '',
   guardianName: '',
   guardianPhone: '',
@@ -48,29 +77,33 @@ export function StudentDialog({
   onOpenChange: (v: boolean) => void
   student: Student | null
 }) {
-  const { data } = useSchool()
-  const [draft, setDraft] = useState<Draft>(() => {
-    const c = data.classes[0]
-    return empty(c?.id ?? '', c?.streams[0] ?? '')
-  })
+  const [draft, setDraft] = useState<Draft>(() =>
+    empty('Play Group')
+  )
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (student) {
       const { id, ...rest } = student
-      setDraft(rest)
+
+      setDraft({
+        ...rest,
+        classId: rest.classId || 'Play Group',
+        stream: rest.stream || 'Main',
+      })
     } else {
-      const c = data.classes[0]
-      setDraft(empty(c?.id ?? '', c?.streams[0] ?? ''))
+      setDraft(empty('Play Group'))
     }
 
     setError('')
-  }, [student, open, data.classes])
+  }, [student, open])
 
-  const selectedClass = data.classes.find(
-    (c) => c.id === draft.classId
-  )
+  const selectedClass = draft.classId
+
+  const availableStreams =
+    CLASS_STREAMS[selectedClass] ?? ['Main']
 
   function set<K extends keyof Draft>(
     key: K,
@@ -83,7 +116,7 @@ export function StudentDialog({
   }
 
   async function handleSave() {
-    if (!draft.firstName || !draft.lastName) {
+    if (!draft.firstName.trim() || !draft.lastName.trim()) {
       setError('First name and last name are required.')
       return
     }
@@ -97,35 +130,29 @@ export function StudentDialog({
     setError('')
 
     try {
-      const selectedClassName =
-        data.classes.find(
-          (c) => c.id === draft.classId
-        )?.name ?? draft.classId
-
       const body = {
         admissionNo:
           draft.admissionNo ||
           `KCS-${Math.floor(2000 + Math.random() * 8000)}`,
 
-        firstName: draft.firstName,
-        lastName: draft.lastName,
+        firstName: draft.firstName.trim(),
+        lastName: draft.lastName.trim(),
         gender: draft.gender,
 
         // IMPORTANT:
-        // Save the actual class NAME to Neon.
-        className: selectedClassName,
+        // classId and className are BOTH the actual class name.
+        classId: draft.classId,
+        className: draft.classId,
 
-        stream: draft.stream,
+        stream: draft.stream || 'Main',
 
-        dateOfBirth:
-          draft.dateOfBirth || null,
+        dateOfBirth: draft.dateOfBirth || null,
 
-        guardianName: draft.guardianName,
-        guardianPhone: draft.guardianPhone,
-        email: draft.email,
+        guardianName: draft.guardianName.trim(),
+        guardianPhone: draft.guardianPhone.trim(),
+        email: draft.email.trim(),
 
-        admissionDate:
-          draft.admissionDate || null,
+        admissionDate: draft.admissionDate || null,
 
         status: draft.status || 'Active',
       }
@@ -147,16 +174,12 @@ export function StudentDialog({
 
       if (!response.ok) {
         throw new Error(
-          result.error ||
-            'Failed to save student.'
+          result.error || 'Failed to save student.'
         )
       }
 
       onOpenChange(false)
 
-      // Refresh the page so Students, Marks and
-      // other database-driven pages immediately
-      // see the new learner.
       window.location.reload()
     } catch (err) {
       console.error(err)
@@ -196,10 +219,7 @@ export function StudentDialog({
             <Input
               value={draft.firstName}
               onChange={(e) =>
-                set(
-                  'firstName',
-                  e.target.value
-                )
+                set('firstName', e.target.value)
               }
             />
           </Field>
@@ -208,10 +228,7 @@ export function StudentDialog({
             <Input
               value={draft.lastName}
               onChange={(e) =>
-                set(
-                  'lastName',
-                  e.target.value
-                )
+                set('lastName', e.target.value)
               }
             />
           </Field>
@@ -220,10 +237,7 @@ export function StudentDialog({
             <Input
               value={draft.admissionNo}
               onChange={(e) =>
-                set(
-                  'admissionNo',
-                  e.target.value
-                )
+                set('admissionNo', e.target.value)
               }
               placeholder="Auto"
             />
@@ -233,10 +247,7 @@ export function StudentDialog({
             <Select
               value={draft.gender}
               onValueChange={(v) =>
-                set(
-                  'gender',
-                  v as Gender
-                )
+                set('gender', v as Gender)
               }
             >
               <SelectTrigger>
@@ -259,16 +270,13 @@ export function StudentDialog({
             <Select
               value={draft.classId}
               onValueChange={(v) => {
-                const c =
-                  data.classes.find(
-                    (x) => x.id === v
-                  )
+                const streams =
+                  CLASS_STREAMS[v] ?? ['Main']
 
                 setDraft((d) => ({
                   ...d,
-                  classId: v ?? '',
-                  stream:
-                    c?.streams[0] ?? '',
+                  classId: v,
+                  stream: streams[0],
                 }))
               }}
             >
@@ -277,12 +285,12 @@ export function StudentDialog({
               </SelectTrigger>
 
               <SelectContent>
-                {data.classes.map((c) => (
+                {SCHOOL_CLASSES.map((className) => (
                   <SelectItem
-                    key={c.id}
-                    value={c.id}
+                    key={className}
+                    value={className}
                   >
-                    {c.name}
+                    {className}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -293,10 +301,7 @@ export function StudentDialog({
             <Select
               value={draft.stream}
               onValueChange={(v) =>
-                set(
-                  'stream',
-                  v ?? ''
-                )
+                set('stream', v)
               }
             >
               <SelectTrigger>
@@ -304,16 +309,14 @@ export function StudentDialog({
               </SelectTrigger>
 
               <SelectContent>
-                {selectedClass?.streams.map(
-                  (s) => (
-                    <SelectItem
-                      key={s}
-                      value={s}
-                    >
-                      {s}
-                    </SelectItem>
-                  )
-                )}
+                {availableStreams.map((stream) => (
+                  <SelectItem
+                    key={stream}
+                    value={stream}
+                  >
+                    {stream}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
@@ -323,10 +326,7 @@ export function StudentDialog({
               type="date"
               value={draft.dateOfBirth}
               onChange={(e) =>
-                set(
-                  'dateOfBirth',
-                  e.target.value
-                )
+                set('dateOfBirth', e.target.value)
               }
             />
           </Field>
@@ -336,10 +336,7 @@ export function StudentDialog({
               type="date"
               value={draft.admissionDate}
               onChange={(e) =>
-                set(
-                  'admissionDate',
-                  e.target.value
-                )
+                set('admissionDate', e.target.value)
               }
             />
           </Field>
@@ -348,10 +345,7 @@ export function StudentDialog({
             <Input
               value={draft.guardianName}
               onChange={(e) =>
-                set(
-                  'guardianName',
-                  e.target.value
-                )
+                set('guardianName', e.target.value)
               }
             />
           </Field>
@@ -360,10 +354,7 @@ export function StudentDialog({
             <Input
               value={draft.guardianPhone}
               onChange={(e) =>
-                set(
-                  'guardianPhone',
-                  e.target.value
-                )
+                set('guardianPhone', e.target.value)
               }
             />
           </Field>
@@ -374,10 +365,7 @@ export function StudentDialog({
                 type="email"
                 value={draft.email}
                 onChange={(e) =>
-                  set(
-                    'email',
-                    e.target.value
-                  )
+                  set('email', e.target.value)
                 }
               />
             </Field>
@@ -393,9 +381,7 @@ export function StudentDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() =>
-              onOpenChange(false)
-            }
+            onClick={() => onOpenChange(false)}
             disabled={saving}
           >
             Cancel
@@ -433,4 +419,4 @@ function Field({
       {children}
     </div>
   )
-        }
+}
