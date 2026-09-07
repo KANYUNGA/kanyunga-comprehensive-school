@@ -125,7 +125,7 @@ const rows = filtered.map((student, index) => [
 
 const csvEscape = (value: unknown) => {
   const text = String(value ?? '')
-  return `"${text.replace(/"/g, '""')}"`
+  return '"' + text.replace(/"/g, '""') + '"'
 }
 
 const csv = [
@@ -141,7 +141,8 @@ const url = URL.createObjectURL(blob)
 const link = document.createElement('a')
 
 link.href = url
-link.download = `${selectedClass.replace(/\s+/g, '_')}_Class_List.csv`
+link.download =
+  selectedClass.replace(/\s+/g, '_') + '_Class_List.csv'
 
 document.body.appendChild(link)
 link.click()
@@ -164,7 +165,9 @@ setDialogOpen(true)
 
 function handleDelete(student: Student) {
 const confirmed = window.confirm(
-Are you sure you want to remove ${studentName(student)}?,
+'Are you sure you want to remove ' +
+studentName(student) +
+'?',
 )
 
 if (!confirmed) {
