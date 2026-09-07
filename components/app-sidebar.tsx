@@ -263,7 +263,7 @@ export function AppSidebar() {
               <span>Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
-        </Sidebar>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   )
