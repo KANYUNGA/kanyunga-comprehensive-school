@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import { useMemo, useState } from 'react'
 import {
@@ -40,7 +40,12 @@ import {
 } from '@/components/ui/select'
 
 import { useSchool } from '@/lib/store'
-import { formatKES, feeForStudent, studentName, type Student } from '@/lib/data'
+import {
+  formatKES,
+  feeForStudent,
+  studentName,
+  type Student,
+} from '@/lib/data'
 
 const SCHOOL_CLASSES = [
   'Play Group',
@@ -365,4 +370,4 @@ export default function StudentsPage() {
       )}
     </div>
   )
-  }
+}
