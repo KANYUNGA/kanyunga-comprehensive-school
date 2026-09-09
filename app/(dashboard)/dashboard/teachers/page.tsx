@@ -1,318 +1,503 @@
+```tsx
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-MoreHorizontal,
-Pencil,
-Search,
-Trash2,
-UserPlus,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  GraduationCap,
+  Mail,
+  Phone,
+  UserRound,
 } from 'lucide-react'
 
-import { PageHeader } from '@/components/page-header'
-import { TeacherDialog } from '@/components/teacher-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import {
-Table,
-TableBody,
-TableCell,
-TableHead,
-TableHeader,
-TableRow,
-} from '@/components/ui/table'
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import {
-DropdownMenu,
-DropdownMenuContent,
-DropdownMenuItem,
-DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 
-import { useSchool } from '@/lib/store'
-import { teacherName, type Teacher } from '@/lib/data'
+type Teacher = {
+  id?: number | string
+  name?: string
+  fullName?: string
+  email?: string
+  phone?: string
+  subject?: string
+  subjects?: string[]
+  className?: string
+  classId?: string
+  status?: string
+}
+
+const emptyTeacher: Teacher = {
+  name: '',
+  fullName: '',
+  email: '',
+  phone: '',
+  subject: '',
+  className: '',
+  classId: '',
+  status: 'Active',
+}
 
 export default function TeachersPage() {
-const { data, deleteTeacher, auth } = useSchool()
+  const [teachers, setTeachers] = useState<Teacher[]>([])
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
+  const [form, setForm] = useState<Teacher>(emptyTeacher)
 
-const [query, setQuery] = useState('')
-const [dialogOpen, setDialogOpen] = useState(false)
-const [editing, setEditing] = useState<Teacher | null>(null)
+  async function loadTeachers() {
+    try {
+      setLoading(true)
 
-const filtered = useMemo(() => {
-const search = query.trim().toLowerCase()
+      const response = await fetch('/api/teachers', {
+        cache: 'no-store',
+      })
 
-if (!search) {
-  return data.teachers
-}
+      const data = await response.json()
 
-return data.teachers.filter((teacher) => {
+      if (data?.success && Array.isArray(data.data)) {
+        setTeachers(data.data)
+      } else if (Array.isArray(data)) {
+        setTeachers(data)
+      } else {
+        setTeachers([])
+      }
+    } catch (error) {
+      console.error('Failed to load teachers:', error)
+      setTeachers([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadTeachers()
+  }, [])
+
+  function teacherName(teacher: Teacher) {
+    return (
+      teacher.fullName?.trim() ||
+      teacher.name?.trim() ||
+      'Unnamed Teacher'
+    )
+  }
+
+  function openAddDialog() {
+    setEditingTeacher(null)
+    setForm({ ...emptyTeacher })
+    setOpen(true)
+  }
+
+  function openEditDialog(teacher: Teacher) {
+    setEditingTeacher(teacher)
+    setForm({
+      ...emptyTeacher,
+      ...teacher,
+    })
+    setOpen(true)
+  }
+
+  function updateField(field: keyof Teacher, value: string) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  async function handleSave() {
+    try {
+      const payload = {
+        ...form,
+        fullName: teacherName(form),
+        name: teacherName(form),
+      }
+
+      const response = await fetch('/api/teachers', {
+        method: editingTeacher ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(
+          editingTeacher
+            ? {
+                ...payload,
+                id: editingTeacher.id,
+              }
+            : payload
+        ),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || data?.success === false) {
+        alert(data?.error || 'Failed to save teacher')
+        return
+      }
+
+      setOpen(false)
+      setEditingTeacher(null)
+      setForm({ ...emptyTeacher })
+      await loadTeachers()
+    } catch (error) {
+      console.error('Save teacher error:', error)
+      alert('Failed to save teacher')
+    }
+  }
+
+  async function handleDelete(teacher: Teacher) {
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ${teacherName(teacher)}?`
+    )
+
+    if (!confirmed) return
+
+    try {
+      const response = await fetch('/api/teachers', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: teacher.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || data?.success === false) {
+        alert(data?.error || 'Failed to remove teacher')
+        return
+      }
+
+      await loadTeachers()
+    } catch (error) {
+      console.error('Delete teacher error:', error)
+      alert('Failed to remove teacher')
+    }
+  }
+
+  const filteredTeachers = useMemo(() => {
+    const search = query.trim().toLowerCase()
+
+    if (!search) return teachers
+
+    return teachers.filter((teacher) => {
+      const text = [
+        teacherName(teacher),
+        teacher.email,
+        teacher.phone,
+        teacher.subject,
+        teacher.className,
+        teacher.classId,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return text.includes(search)
+    })
+  }, [teachers, query])
+
   return (
-    teacherName(teacher).toLowerCase().includes(search) ||
-    String(teacher.staffNo ?? '')
-      .toLowerCase()
-      .includes(search) ||
-    String(teacher.email ?? '')
-      .toLowerCase()
-      .includes(search) ||
-    String(teacher.phone ?? '')
-      .toLowerCase()
-      .includes(search)
-  )
-})
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Teachers
+          </h1>
+          <p className="text-muted-foreground">
+            Manage teachers and their information.
+          </p>
+        </div>
 
-
-}, [data.teachers, query])
-
-function subjectNames(ids: string[] = []) {
-return ids
-.map(
-(id) =>
-data.subjects.find(
-(subject) => String(subject.id) === String(id)
-)?.name
-)
-.filter(Boolean) as string[]
-}
-
-function openRegisterDialog() {
-setEditing(null)
-setDialogOpen(true)
-}
-
-function openEditDialog(teacher: Teacher) {
-setEditing(teacher)
-setDialogOpen(true)
-}
-
-function handleDelete(teacher: Teacher) {
-const confirmed = window.confirm(
-Are you sure you want to remove ${teacherName(teacher)}?
-)
-
-if (!confirmed) {
-  return
-}
-
-deleteTeacher(teacher.id)
-
-
-}
-
-return (
-<div className="space-y-6">
-<PageHeader
-title="Teachers"
-description="Manage teaching staff and their subject assignments."
-actions={
-auth?.role === 'admin' ? (
-<Button onClick={openRegisterDialog}>
-<UserPlus className="h-4 w-4" />
-Register Teacher
-</Button>
-) : null
-}
-/>
-
-  <Card className="p-4">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="relative flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-        <Input
-          placeholder="Search by name, staff number, email or phone..."
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="pl-9"
-        />
+        <Button onClick={openAddDialog}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Teacher
+        </Button>
       </div>
 
-      <Badge variant="secondary" className="w-fit">
-        {filtered.length} of {data.teachers.length}
-      </Badge>
-    </div>
-  </Card>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <CardTitle>
+              Teacher List ({filteredTeachers.length})
+            </CardTitle>
 
-  <Card className="overflow-hidden p-0">
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Teacher</TableHead>
-            <TableHead>Staff No</TableHead>
-            <TableHead>Phone</TableHead>
-            <TableHead>Subjects</TableHead>
-            <TableHead>Status</TableHead>
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search teachers..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+        </CardHeader>
 
-            {auth?.role === 'admin' && (
-              <TableHead className="w-10" />
-            )}
-          </TableRow>
-        </TableHeader>
+        <CardContent>
+          {loading ? (
+            <div className="py-10 text-center text-muted-foreground">
+              Loading teachers...
+            </div>
+          ) : filteredTeachers.length === 0 ? (
+            <div className="py-10 text-center text-muted-foreground">
+              No teachers found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px]">
+                <thead>
+                  <tr className="border-b text-left text-sm">
+                    <th className="px-3 py-3 font-medium">
+                      Teacher
+                    </th>
+                    <th className="px-3 py-3 font-medium">
+                      Contact
+                    </th>
+                    <th className="px-3 py-3 font-medium">
+                      Subject
+                    </th>
+                    <th className="px-3 py-3 font-medium">
+                      Class
+                    </th>
+                    <th className="px-3 py-3 font-medium">
+                      Status
+                    </th>
+                    <th className="px-3 py-3 text-right font-medium">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
 
-        <TableBody>
-          {filtered.map((teacher) => {
-            const subjects = subjectNames(
-              teacher.subjectIds ?? []
-            )
-
-            return (
-              <TableRow key={teacher.id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-xs font-semibold text-violet-600">
-                      {teacher.firstName?.[0] ?? ''}
-                      {teacher.lastName?.[0] ?? ''}
-                    </span>
-
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground">
-                        {teacherName(teacher)}
-                      </p>
-
-                      {teacher.email && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          {teacher.email}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </TableCell>
-
-                <TableCell className="font-mono text-xs">
-                  {teacher.staffNo || '—'}
-                </TableCell>
-
-                <TableCell className="text-sm">
-                  {teacher.phone || '—'}
-                </TableCell>
-
-                <TableCell>
-                  {subjects.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {subjects.map((name) => (
-                        <Badge
-                          key={name}
-                          variant="secondary"
-                          className="font-normal"
-                        >
-                          {name}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">
-                      No subjects assigned
-                    </span>
-                  )}
-                </TableCell>
-
-                <TableCell>
-                  <Badge
-                    variant="secondary"
-                    className={
-                      teacher.status === 'Inactive'
-                        ? 'bg-red-50 text-red-700'
-                        : 'bg-emerald-50 text-emerald-700'
-                    }
-                  >
-                    {teacher.status || 'Active'}
-                  </Badge>
-                </TableCell>
-
-                {auth?.role === 'admin' && (
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                          />
-                        }
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-
-                        <span className="sr-only">
-                          Actions for {teacherName(teacher)}
-                        </span>
-                      </DropdownMenuTrigger>
-
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            openEditDialog(teacher)
-                          }
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() =>
-                            handleDelete(teacher)
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                )}
-              </TableRow>
-            )
-          })}
-
-          {filtered.length === 0 && (
-            <TableRow>
-              <TableCell
-                colSpan={auth?.role === 'admin' ? 6 : 5}
-                className="py-12 text-center text-muted-foreground"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <UserPlus className="h-8 w-8 opacity-40" />
-
-                  <p className="font-medium">
-                    No teachers found.
-                  </p>
-
-                  <p className="text-sm">
-                    {query
-                      ? 'Try adjusting your search.'
-                      : 'Register a teacher to see them here.'}
-                  </p>
-
-                  {auth?.role === 'admin' && !query && (
-                    <Button
-                      className="mt-2"
-                      onClick={openRegisterDialog}
+                <tbody>
+                  {filteredTeachers.map((teacher, index) => (
+                    <tr
+                      key={teacher.id ?? index}
+                      className="border-b last:border-0"
                     >
-                      <UserPlus className="h-4 w-4" />
-                      Register Teacher
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
+                      <td className="px-3 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                            <UserRound className="h-5 w-5 text-muted-foreground" />
+                          </div>
+
+                          <div>
+                            <div className="font-medium">
+                              {teacherName(teacher)}
+                            </div>
+
+                            {teacher.id !== undefined && (
+                              <div className="text-xs text-muted-foreground">
+                                ID: {teacher.id}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-4">
+                        <div className="space-y-1 text-sm">
+                          {teacher.email && (
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                              {teacher.email}
+                            </div>
+                          )}
+
+                          {teacher.phone && (
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                              {teacher.phone}
+                            </div>
+                          )}
+
+                          {!teacher.email && !teacher.phone && (
+                            <span className="text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-4">
+                        {teacher.subjects?.length
+                          ? teacher.subjects.join(', ')
+                          : teacher.subject || '—'}
+                      </td>
+
+                      <td className="px-3 py-4">
+                        {teacher.className ||
+                          teacher.classId ||
+                          '—'}
+                      </td>
+
+                      <td className="px-3 py-4">
+                        <span className="rounded-full bg-muted px-2.5 py-1 text-xs">
+                          {teacher.status || 'Active'}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-4">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() =>
+                              openEditDialog(teacher)
+                            }
+                            title="Edit teacher"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={() =>
+                              handleDelete(teacher)
+                            }
+                            title="Remove teacher"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </TableBody>
-      </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTeacher
+                ? 'Edit Teacher'
+                : 'Add Teacher'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="teacher-name">
+                Full Name
+              </Label>
+              <Input
+                id="teacher-name"
+                value={form.fullName || form.name || ''}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    fullName: event.target.value,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Enter teacher name"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="teacher-email">
+                Email
+              </Label>
+              <Input
+                id="teacher-email"
+                type="email"
+                value={form.email || ''}
+                onChange={(event) =>
+                  updateField('email', event.target.value)
+                }
+                placeholder="teacher@example.com"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="teacher-phone">
+                Phone
+              </Label>
+              <Input
+                id="teacher-phone"
+                value={form.phone || ''}
+                onChange={(event) =>
+                  updateField('phone', event.target.value)
+                }
+                placeholder="Phone number"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="teacher-subject">
+                Subject
+              </Label>
+              <Input
+                id="teacher-subject"
+                value={form.subject || ''}
+                onChange={(event) =>
+                  updateField('subject', event.target.value)
+                }
+                placeholder="e.g. Mathematics"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="teacher-class">
+                Class
+              </Label>
+              <Input
+                id="teacher-class"
+                value={form.className || form.classId || ''}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    className: event.target.value,
+                    classId: event.target.value,
+                  }))
+                }
+                placeholder="e.g. Grade 8"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+
+              <Button onClick={handleSave}>
+                <GraduationCap className="mr-2 h-4 w-4" />
+                {editingTeacher
+                  ? 'Save Changes'
+                  : 'Add Teacher'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
-  </Card>
-
-  {auth?.role === 'admin' && (
-    <TeacherDialog
-      open={dialogOpen}
-      onOpenChange={setDialogOpen}
-      teacher={editing}
-    />
-  )}
-</div>
-
-
-)
+  )
 }
+```
