@@ -26,31 +26,31 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 
 type Teacher = {
-  id?: number | string
-  name?: string
-  fullName?: string
-  email?: string
+  id?: string | number
+  staffNo?: string
+  firstName?: string
+  lastName?: string
+  gender?: string
   phone?: string
-  subject?: string
-  subjects?: string[]
-  className?: string
-  classId?: string
+  email?: string
+  subjectIds?: string[]
+  employmentDate?: string
   status?: string
 }
 
 const emptyTeacher: Teacher = {
-  name: '',
-  fullName: '',
-  email: '',
+  staffNo: '',
+  firstName: '',
+  lastName: '',
+  gender: 'Male',
   phone: '',
-  subject: '',
-  className: '',
-  classId: '',
+  email: '',
+  subjectIds: [],
+  employmentDate: '',
   status: 'Active',
 }
 
@@ -59,7 +59,8 @@ export default function TeachersPage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
+  const [editingTeacher, setEditingTeacher] =
+    useState<Teacher | null>(null)
   const [form, setForm] = useState<Teacher>(emptyTeacher)
 
   async function loadTeachers() {
@@ -72,13 +73,17 @@ export default function TeachersPage() {
 
       const data = await response.json()
 
-      if (data?.success && Array.isArray(data.data)) {
-        setTeachers(data.data)
-      } else if (Array.isArray(data)) {
-        setTeachers(data)
-      } else {
-        setTeachers([])
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to load teachers')
       }
+
+      const teacherList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.teachers)
+          ? data.teachers
+          : []
+
+      setTeachers(teacherList)
     } catch (error) {
       console.error('Failed to load teachers:', error)
       setTeachers([])
@@ -92,11 +97,15 @@ export default function TeachersPage() {
   }, [])
 
   function teacherName(teacher: Teacher) {
-    return (
-      teacher.fullName?.trim() ||
-      teacher.name?.trim() ||
-      'Unnamed Teacher'
-    )
+    const name = [
+      teacher.firstName,
+      teacher.lastName,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+
+    return name || 'Unnamed Teacher'
   }
 
   function openAddDialog() {
@@ -110,11 +119,15 @@ export default function TeachersPage() {
     setForm({
       ...emptyTeacher,
       ...teacher,
+      subjectIds: teacher.subjectIds || [],
     })
     setOpen(true)
   }
 
-  function updateField(field: keyof Teacher, value: string) {
+  function updateField(
+    field: keyof Teacher,
+    value: string
+  ) {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -123,10 +136,19 @@ export default function TeachersPage() {
 
   async function handleSave() {
     try {
+      if (!form.firstName?.trim() || !form.lastName?.trim()) {
+        alert('First name and last name are required')
+        return
+      }
+
       const payload = {
         ...form,
-        fullName: teacherName(form),
-        name: teacherName(form),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        staffNo: form.staffNo?.trim() || '',
+        phone: form.phone?.trim() || '',
+        email: form.email?.trim() || '',
+        subjectIds: form.subjectIds || [],
       }
 
       const response = await fetch('/api/teachers', {
@@ -147,13 +169,18 @@ export default function TeachersPage() {
       const data = await response.json()
 
       if (!response.ok || data?.success === false) {
-        alert(data?.error || 'Failed to save teacher')
+        alert(
+          data?.error ||
+            data?.detail ||
+            'Failed to save teacher'
+        )
         return
       }
 
       setOpen(false)
       setEditingTeacher(null)
       setForm({ ...emptyTeacher })
+
       await loadTeachers()
     } catch (error) {
       console.error('Save teacher error:', error)
@@ -163,8 +190,8 @@ export default function TeachersPage() {
 
   async function handleDelete(teacher: Teacher) {
     const confirmed = window.confirm(
-  `Are you sure you want to remove ${teacherName(teacher)}?`
-)
+      `Are you sure you want to remove ${teacherName(teacher)}?`
+    )
 
     if (!confirmed) return
 
@@ -182,7 +209,11 @@ export default function TeachersPage() {
       const data = await response.json()
 
       if (!response.ok || data?.success === false) {
-        alert(data?.error || 'Failed to remove teacher')
+        alert(
+          data?.error ||
+            data?.detail ||
+            'Failed to remove teacher'
+        )
         return
       }
 
@@ -201,11 +232,10 @@ export default function TeachersPage() {
     return teachers.filter((teacher) => {
       const text = [
         teacherName(teacher),
+        teacher.staffNo,
         teacher.email,
         teacher.phone,
-        teacher.subject,
-        teacher.className,
-        teacher.classId,
+        ...(teacher.subjectIds || []),
       ]
         .filter(Boolean)
         .join(' ')
@@ -222,6 +252,7 @@ export default function TeachersPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             Teachers
           </h1>
+
           <p className="text-muted-foreground">
             Manage teachers and their information.
           </p>
@@ -242,9 +273,12 @@ export default function TeachersPage() {
 
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
               <Input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) =>
+                  setQuery(event.target.value)
+                }
                 placeholder="Search teachers..."
                 className="pl-9"
               />
@@ -263,24 +297,33 @@ export default function TeachersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px]">
+              <table className="w-full min-w-[800px]">
                 <thead>
                   <tr className="border-b text-left text-sm">
                     <th className="px-3 py-3 font-medium">
                       Teacher
                     </th>
+
+                    <th className="px-3 py-3 font-medium">
+                      Staff No.
+                    </th>
+
                     <th className="px-3 py-3 font-medium">
                       Contact
                     </th>
+
                     <th className="px-3 py-3 font-medium">
                       Subject
                     </th>
+
                     <th className="px-3 py-3 font-medium">
-                      Class
+                      Employment Date
                     </th>
+
                     <th className="px-3 py-3 font-medium">
                       Status
                     </th>
+
                     <th className="px-3 py-3 text-right font-medium">
                       Actions
                     </th>
@@ -313,6 +356,10 @@ export default function TeachersPage() {
                         </div>
                       </td>
 
+                      <td className="px-3 py-4 text-sm">
+                        {teacher.staffNo || '—'}
+                      </td>
+
                       <td className="px-3 py-4">
                         <div className="space-y-1 text-sm">
                           {teacher.email && (
@@ -329,24 +376,23 @@ export default function TeachersPage() {
                             </div>
                           )}
 
-                          {!teacher.email && !teacher.phone && (
-                            <span className="text-muted-foreground">
-                              —
-                            </span>
-                          )}
+                          {!teacher.email &&
+                            !teacher.phone && (
+                              <span className="text-muted-foreground">
+                                —
+                              </span>
+                            )}
                         </div>
                       </td>
 
                       <td className="px-3 py-4">
-                        {teacher.subjects?.length
-                          ? teacher.subjects.join(', ')
-                          : teacher.subject || '—'}
+                        {teacher.subjectIds?.length
+                          ? teacher.subjectIds.join(', ')
+                          : '—'}
                       </td>
 
-                      <td className="px-3 py-4">
-                        {teacher.className ||
-                          teacher.classId ||
-                          '—'}
+                      <td className="px-3 py-4 text-sm">
+                        {teacher.employmentDate || '—'}
                       </td>
 
                       <td className="px-3 py-4">
@@ -401,33 +447,75 @@ export default function TeachersPage() {
 
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="teacher-name">
-                Full Name
+              <Label htmlFor="teacher-staff-no">
+                Staff / TSC Number
               </Label>
+
               <Input
-                id="teacher-name"
-                value={form.fullName || form.name || ''}
+                id="teacher-staff-no"
+                value={form.staffNo || ''}
                 onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    fullName: event.target.value,
-                    name: event.target.value,
-                  }))
+                  updateField(
+                    'staffNo',
+                    event.target.value
+                  )
                 }
-                placeholder="Enter teacher name"
+                placeholder="e.g. TSC/12345"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="teacher-first-name">
+                  First Name
+                </Label>
+
+                <Input
+                  id="teacher-first-name"
+                  value={form.firstName || ''}
+                  onChange={(event) =>
+                    updateField(
+                      'firstName',
+                      event.target.value
+                    )
+                  }
+                  placeholder="First name"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="teacher-last-name">
+                  Last Name
+                </Label>
+
+                <Input
+                  id="teacher-last-name"
+                  value={form.lastName || ''}
+                  onChange={(event) =>
+                    updateField(
+                      'lastName',
+                      event.target.value
+                    )
+                  }
+                  placeholder="Last name"
+                />
+              </div>
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="teacher-email">
                 Email
               </Label>
+
               <Input
                 id="teacher-email"
                 type="email"
                 value={form.email || ''}
                 onChange={(event) =>
-                  updateField('email', event.target.value)
+                  updateField(
+                    'email',
+                    event.target.value
+                  )
                 }
                 placeholder="teacher@example.com"
               />
@@ -437,11 +525,15 @@ export default function TeachersPage() {
               <Label htmlFor="teacher-phone">
                 Phone
               </Label>
+
               <Input
                 id="teacher-phone"
                 value={form.phone || ''}
                 onChange={(event) =>
-                  updateField('phone', event.target.value)
+                  updateField(
+                    'phone',
+                    event.target.value
+                  )
                 }
                 placeholder="Phone number"
               />
@@ -451,31 +543,40 @@ export default function TeachersPage() {
               <Label htmlFor="teacher-subject">
                 Subject
               </Label>
+
               <Input
                 id="teacher-subject"
-                value={form.subject || ''}
+                value={
+                  form.subjectIds?.join(', ') || ''
+                }
                 onChange={(event) =>
-                  updateField('subject', event.target.value)
+                  setForm((current) => ({
+                    ...current,
+                    subjectIds: event.target.value
+                      .split(',')
+                      .map((item) => item.trim())
+                      .filter(Boolean),
+                  }))
                 }
                 placeholder="e.g. Mathematics"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="teacher-class">
-                Class
+              <Label htmlFor="teacher-date">
+                Employment Date
               </Label>
+
               <Input
-                id="teacher-class"
-                value={form.className || form.classId || ''}
+                id="teacher-date"
+                type="date"
+                value={form.employmentDate || ''}
                 onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    className: event.target.value,
-                    classId: event.target.value,
-                  }))
+                  updateField(
+                    'employmentDate',
+                    event.target.value
+                  )
                 }
-                placeholder="e.g. Grade 8"
               />
             </div>
 
@@ -489,6 +590,7 @@ export default function TeachersPage() {
 
               <Button onClick={handleSave}>
                 <GraduationCap className="mr-2 h-4 w-4" />
+
                 {editingTeacher
                   ? 'Save Changes'
                   : 'Add Teacher'}
@@ -500,4 +602,3 @@ export default function TeachersPage() {
     </div>
   )
 }
-
