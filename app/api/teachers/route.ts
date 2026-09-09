@@ -1,3 +1,4 @@
+```ts
 import { getDb } from "@/lib/db"
 import { requireAdmin } from "@/lib/server-auth"
 
@@ -41,15 +42,24 @@ export async function GET() {
         status,
         created_at
       FROM teachers
-      ORDER BY id
+      ORDER BY id ASC
     `
 
-    return Response.json(teachers.map(mapTeacher))
+    console.log("Teachers returned from database:", teachers.length)
+
+    return Response.json({
+      success: true,
+      count: teachers.length,
+      teachers: teachers.map(mapTeacher),
+    })
   } catch (error) {
     console.error("Failed to fetch teachers:", error)
 
     return Response.json(
-      { error: "Failed to fetch teachers" },
+      {
+        success: false,
+        error: "Failed to fetch teachers",
+      },
       { status: 500 }
     )
   }
@@ -62,7 +72,7 @@ export async function POST(request: Request) {
   try {
     const teacher = await request.json()
 
-    if (!teacher.firstName || !teacher.lastName) {
+    if (!teacher.firstName?.trim() || !teacher.lastName?.trim()) {
       return Response.json(
         { error: "First name and last name are required" },
         { status: 400 }
@@ -82,12 +92,12 @@ export async function POST(request: Request) {
         status
       )
       VALUES (
-        ${teacher.staffNo || ""},
-        ${teacher.firstName},
-        ${teacher.lastName},
+        ${teacher.staffNo?.trim() || ""},
+        ${teacher.firstName.trim()},
+        ${teacher.lastName.trim()},
         ${teacher.gender || "Male"},
-        ${teacher.phone || ""},
-        ${teacher.email || ""},
+        ${teacher.phone?.trim() || ""},
+        ${teacher.email?.trim() || ""},
         ${(teacher.subjectIds || []).join(",")},
         ${teacher.employmentDate || null},
         ${teacher.status || "Active"}
@@ -105,13 +115,25 @@ export async function POST(request: Request) {
         status
     `
 
-    return Response.json(mapTeacher(result[0]), { status: 201 })
+    return Response.json(
+      {
+        success: true,
+        teacher: mapTeacher(result[0]),
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error("Failed to create teacher:", error)
 
     return Response.json(
-      { error: "Failed to create teacher" },
+      {
+        success: false,
+        error: "Failed to create teacher",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     )
   }
 }
+```
+        
