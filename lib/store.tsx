@@ -1,3 +1,4 @@
+
 'use client'
 
 import {
@@ -8,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+
 import {
   createSampleData,
   type AttendanceStatus,
@@ -23,573 +25,632 @@ import {
 
 export type Role = 'admin' | 'teacher' | 'parent'
 
-export interface AuthUser {
-  role: Role
-  name: string
-  studentId?: string
-}
-
 type StudentWithPhoto = Student & {
   photoUrl?: string
 }
 
-interface DataContextValue {
+type SchoolContextValue = {
   data: SchoolData
-  auth: AuthUser | null
-  login: (user: AuthUser) => void
-  logout: () => void
-  updateSchool: (info: Partial<SchoolInfo>) => void
+  role: Role
 
-  addStudent: (s: Omit<StudentWithPhoto, 'id'>) => Promise<void>
-  updateStudent: (
-    id: string,
-    patch: Partial<StudentWithPhoto>
-  ) => Promise<void>
+  addStudent: (student: Student) => Promise<void>
+  updateStudent: (student: Student) => Promise<void>
   deleteStudent: (id: string) => Promise<void>
 
-  addTeacher: (t: Omit<Teacher, 'id'>) => Promise<void>
-  updateTeacher: (id: string, patch: Partial<Teacher>) => Promise<void>
+  addTeacher: (teacher: Teacher) => Promise<void>
+  updateTeacher: (teacher: Teacher) => Promise<void>
   deleteTeacher: (id: string) => Promise<void>
 
-  addClass: (c: Omit<ClassLevel, 'id'>) => Promise<void>
-  addSubject: (s: Omit<Subject, 'id'>) => Promise<void>
+  addClass: (item: any) => Promise<void>
+  updateClass: (item: any) => Promise<void>
+  deleteClass: (id: string) => Promise<void>
 
-  setStudentAttendance: (
+  addSubject: (item: Subject) => Promise<void>
+  updateSubject: (item: Subject) => Promise<void>
+  deleteSubject: (id: string) => Promise<void>
+
+  addExam: (item: Exam) => Promise<void>
+  updateExam: (item: Exam) => Promise<void>
+  deleteExam: (id: string) => Promise<void>
+
+  addPayment: (item: Payment) => Promise<void>
+
+  updateSchoolInfo: (info: SchoolInfo) => void
+
+  saveAttendance: (
+    studentId: string,
     date: string,
-    records: { studentId: string; status: AttendanceStatus }[]
-  ) => void
-
-  setTeacherAttendance: (
-    date: string,
-    records: { teacherId: string; status: AttendanceStatus }[]
-  ) => void
-
-  addExam: (e: Omit<Exam, 'id'>) => Promise<void>
-
-  saveMarks: (
-    examId: string,
-    entries: {
-      studentId: string
-      subjectId: string
-      score: number
-    }[]
+    status: AttendanceStatus
   ) => Promise<void>
-
-  addPayment: (p: Omit<Payment, 'id'>) => Promise<void>
 }
 
-const DataContext = createContext<DataContextValue | null>(null)
+const SchoolContext = createContext<SchoolContextValue | null>(null)
 
-export function DataProvider({ children }: { children: ReactNode }) {
+function mapStudent(student: any): StudentWithPhoto {
+  return {
+    id: String(student.id),
+    admissionNo:
+      student.admissionNo ??
+      student.admission_number ??
+      '',
+    firstName:
+      student.firstName ??
+      student.first_name ??
+      '',
+    middleName:
+      student.middleName ??
+      student.middle_name ??
+      '',
+    lastName:
+      student.lastName ??
+      student.last_name ??
+      '',
+    gender: student.gender ?? 'Male',
+    dateOfBirth:
+      student.dateOfBirth ??
+      student.date_of_birth ??
+      '',
+    classId:
+      student.classId ??
+      student.className ??
+      student.class_name ??
+      '',
+    className:
+      student.className ??
+      student.class_name ??
+      '',
+    stream: student.stream ?? 'Main',
+    guardianName:
+      student.guardianName ??
+      student.parentName ??
+      student.parent_name ??
+      '',
+    guardianPhone:
+      student.guardianPhone ??
+      student.parentPhone ??
+      student.parent_phone ??
+      '',
+    address: student.address ?? '',
+    admissionDate:
+      student.admissionDate ??
+      student.admission_date ??
+      '',
+    status: student.status ?? 'Active',
+    createdAt:
+      student.createdAt ??
+      student.created_at ??
+      '',
+    photoUrl:
+      student.photoUrl ??
+      student.photo_url ??
+      '',
+  }
+}
+
+function mapTeacher(teacher: any): Teacher {
+  return {
+    id: String(teacher.id),
+    staffNo:
+      teacher.staffNo ??
+      teacher.teacher_number ??
+      '',
+    firstName:
+      teacher.firstName ??
+      teacher.first_name ??
+      '',
+    lastName:
+      teacher.lastName ??
+      teacher.last_name ??
+      '',
+    gender: teacher.gender ?? 'Male',
+    phone: teacher.phone ?? '',
+    email: teacher.email ?? '',
+    subjectIds:
+      teacher.subjectIds ??
+      (teacher.subject
+        ? String(teacher.subject)
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+        : []),
+    employmentDate:
+      teacher.employmentDate ??
+      teacher.employment_date ??
+      '',
+    status: teacher.status ?? 'Active',
+  }
+}
+
+export function SchoolProvider({
+  children,
+}: {
+  children: ReactNode
+}) {
   const [data, setData] = useState<SchoolData>(() => createSampleData())
-  const [auth, setAuth] = useState<AuthUser | null>(null)
+  const [role] = useState<Role>('admin')
+
+  const loadData = async () => {
+    try {
+      const [
+        studentsRes,
+        paymentsRes,
+        feesRes,
+        teachersRes,
+        classesRes,
+        subjectsRes,
+        examsRes,
+        marksRes,
+      ] = await Promise.all([
+        fetch('/api/students', { cache: 'no-store' }),
+        fetch('/api/payments', { cache: 'no-store' }),
+        fetch('/api/fees', { cache: 'no-store' }),
+        fetch('/api/teachers', { cache: 'no-store' }),
+        fetch('/api/classes', { cache: 'no-store' }),
+        fetch('/api/subjects', { cache: 'no-store' }),
+        fetch('/api/exams', { cache: 'no-store' }),
+        fetch('/api/marks', { cache: 'no-store' }),
+      ])
+
+      const studentsJson = studentsRes.ok
+        ? await studentsRes.json()
+        : []
+
+      const paymentsJson = paymentsRes.ok
+        ? await paymentsRes.json()
+        : []
+
+      const feesJson = feesRes.ok
+        ? await feesRes.json()
+        : []
+
+      const teachersJson = teachersRes.ok
+        ? await teachersRes.json()
+        : []
+
+      const classesJson = classesRes.ok
+        ? await classesRes.json()
+        : []
+
+      const subjectsJson = subjectsRes.ok
+        ? await subjectsRes.json()
+        : []
+
+      const examsJson = examsRes.ok
+        ? await examsRes.json()
+        : []
+
+      const marksJson = marksRes.ok
+        ? await marksRes.json()
+        : []
+
+      const studentsArray = Array.isArray(studentsJson)
+        ? studentsJson
+        : studentsJson.students ?? []
+
+      const teachersArray = Array.isArray(teachersJson)
+        ? teachersJson
+        : teachersJson.teachers ?? []
+
+      const classesArray = Array.isArray(classesJson)
+        ? classesJson
+        : classesJson.classes ?? []
+
+      const subjectsArray = Array.isArray(subjectsJson)
+        ? subjectsJson
+        : subjectsJson.subjects ?? []
+
+      const examsArray = Array.isArray(examsJson)
+        ? examsJson
+        : examsJson.exams ?? []
+
+      const marksArray = Array.isArray(marksJson)
+        ? marksJson
+        : marksJson.marks ?? []
+
+      const paymentsArray = Array.isArray(paymentsJson)
+        ? paymentsJson
+        : paymentsJson.payments ?? []
+
+      const feesArray = Array.isArray(feesJson)
+        ? feesJson
+        : feesJson.fees ?? []
+
+      setData((current) => ({
+        ...current,
+
+        students:
+          studentsArray.length > 0
+            ? studentsArray.map(mapStudent)
+            : current.students,
+
+        teachers:
+          teachersArray.length > 0
+            ? teachersArray.map(mapTeacher)
+            : current.teachers,
+
+        classes:
+          classesArray.length > 0
+            ? classesArray
+            : current.classes,
+
+        subjects:
+          subjectsArray.length > 0
+            ? subjectsArray
+            : current.subjects,
+
+        exams:
+          examsArray.length > 0
+            ? examsArray
+            : current.exams,
+
+        marks:
+          marksArray.length > 0
+            ? marksArray
+            : current.marks,
+
+        payments:
+          paymentsArray.length > 0
+            ? paymentsArray
+            : current.payments,
+
+        fees:
+          feesArray.length > 0
+            ? feesArray
+            : current.fees,
+      }))
+    } catch (error) {
+      console.error('Failed to load school data:', error)
+    }
+  }
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [
-          studentsResponse,
-          paymentsResponse,
-          feesResponse,
-          teachersResponse,
-          classesResponse,
-          subjectsResponse,
-          examsResponse,
-          marksResponse,
-        ] = await Promise.all([
-          fetch('/api/students'),
-          fetch('/api/payments'),
-          fetch('/api/fees'),
-          fetch('/api/teachers'),
-          fetch('/api/classes'),
-          fetch('/api/subjects'),
-          fetch('/api/exams'),
-          fetch('/api/marks'),
-        ])
-
-        if (!studentsResponse.ok) {
-          throw new Error('Failed to load students')
-        }
-
-        if (!paymentsResponse.ok) {
-          throw new Error('Failed to load payments')
-        }
-
-        if (!feesResponse.ok) {
-          throw new Error('Failed to load fees')
-        }
-
-        if (!teachersResponse.ok) {
-          throw new Error('Failed to load teachers')
-        }
-
-        if (!classesResponse.ok) {
-          throw new Error('Failed to load classes')
-        }
-
-        if (!marksResponse.ok) {
-          throw new Error('Failed to load marks')
-        }
-
-        const students = (await studentsResponse.json()) as StudentWithPhoto[]
-        const payments = await paymentsResponse.json()
-        const fees = await feesResponse.json()
-        const teachers = await teachersResponse.json()
-        const classes = await classesResponse.json()
-        const subjects = await subjectsResponse.json()
-        const exams = await examsResponse.json()
-        const marks = await marksResponse.json()
-
-        setData((current) => ({
-          ...current,
-
-          // Keep photoUrl exactly as returned by the API.
-          students: students.map((student) => ({
-            ...student,
-            photoUrl: student.photoUrl || '',
-          })),
-
-          payments,
-
-          feeStructures: fees.map(
-            (fee: {
-              id: string
-              studentId: string
-              term: string
-              year: number
-              amountRequired: number
-            }) => ({
-              id: fee.id,
-              classId: fee.studentId,
-              term: fee.term,
-              year: fee.year,
-              amount: fee.amountRequired,
-            })
-          ),
-
-          teachers,
-          classes,
-          subjects,
-          exams,
-          marks,
-        }))
-      } catch (error) {
-        console.error('Failed to load school data:', error)
-      }
-    }
-
     loadData()
   }, [])
 
-  const value = useMemo<DataContextValue>(
+  const addStudent = async (student: Student) => {
+    const response = await fetch('/api/students', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(student),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create student')
+    }
+
+    await loadData()
+  }
+
+  const updateStudent = async (student: Student) => {
+    const response = await fetch(
+      `/api/students/${encodeURIComponent(student.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(student),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to update student')
+    }
+
+    await loadData()
+  }
+
+  const deleteStudent = async (id: string) => {
+    const response = await fetch(
+      `/api/students/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to delete student')
+    }
+
+    await loadData()
+  }
+
+  const addTeacher = async (teacher: Teacher) => {
+    const response = await fetch('/api/teachers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(teacher),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null)
+
+      throw new Error(
+        error?.error ||
+          error?.detail ||
+          'Failed to create teacher'
+      )
+    }
+
+    await loadData()
+  }
+
+  const updateTeacher = async (teacher: Teacher) => {
+    const response = await fetch(
+      `/api/teachers/${encodeURIComponent(teacher.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(teacher),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to update teacher')
+    }
+
+    await loadData()
+  }
+
+  const deleteTeacher = async (id: string) => {
+    const response = await fetch(
+      `/api/teachers/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to delete teacher')
+    }
+
+    await loadData()
+  }
+
+  const addClass = async (item: any) => {
+    const response = await fetch('/api/classes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(item),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create class')
+    }
+
+    await loadData()
+  }
+
+  const updateClass = async (item: any) => {
+    const response = await fetch(
+      `/api/classes/${encodeURIComponent(item.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(item),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to update class')
+    }
+
+    await loadData()
+  }
+
+  const deleteClass = async (id: string) => {
+    const response = await fetch(
+      `/api/classes/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to delete class')
+    }
+
+    await loadData()
+  }
+
+  const addSubject = async (item: Subject) => {
+    const response = await fetch('/api/subjects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(item),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create subject')
+    }
+
+    await loadData()
+  }
+
+  const updateSubject = async (item: Subject) => {
+    const response = await fetch(
+      `/api/subjects/${encodeURIComponent(item.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(item),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to update subject')
+    }
+
+    await loadData()
+  }
+
+  const deleteSubject = async (id: string) => {
+    const response = await fetch(
+      `/api/subjects/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to delete subject')
+    }
+
+    await loadData()
+  }
+
+  const addExam = async (item: Exam) => {
+    const response = await fetch('/api/exams', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(item),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create exam')
+    }
+
+    await loadData()
+  }
+
+  const updateExam = async (item: Exam) => {
+    const response = await fetch(
+      `/api/exams/${encodeURIComponent(item.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(item),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to update exam')
+    }
+
+    await loadData()
+  }
+
+  const deleteExam = async (id: string) => {
+    const response = await fetch(
+      `/api/exams/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to delete exam')
+    }
+
+    await loadData()
+  }
+
+  const addPayment = async (item: Payment) => {
+    const response = await fetch('/api/payments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(item),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create payment')
+    }
+
+    await loadData()
+  }
+
+  const updateSchoolInfo = (info: SchoolInfo) => {
+    setData((current) => ({
+      ...current,
+      school: info,
+    }))
+  }
+
+  const saveAttendance = async (
+    studentId: string,
+    date: string,
+    status: AttendanceStatus
+  ) => {
+    const response = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        studentId,
+        date,
+        status,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to save attendance')
+    }
+
+    await loadData()
+  }
+
+  const value = useMemo<SchoolContextValue>(
     () => ({
       data,
-      auth,
-
-      login: (user) => setAuth(user),
-
-      logout: () => setAuth(null),
-
-      updateSchool: (info) =>
-        setData((d) => ({
-          ...d,
-          school: {
-            ...d.school,
-            ...info,
-          },
-        })),
-
-      addStudent: async (s) => {
-        try {
-          const response = await fetch('/api/students', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(s),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to save student')
-          }
-
-          const responseData = await fetch('/api/students')
-
-          if (!responseData.ok) {
-            throw new Error('Failed to reload students')
-          }
-
-          const students =
-            (await responseData.json()) as StudentWithPhoto[]
-
-          setData((d) => ({
-            ...d,
-            students: students.map((student) => ({
-              ...student,
-              photoUrl: student.photoUrl || '',
-            })),
-          }))
-        } catch (error) {
-          console.error('Failed to add student:', error)
-          throw error
-        }
-      },
-
-      updateStudent: async (id, patch) => {
-        try {
-          const response = await fetch(`/api/students/${id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(patch),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to update student')
-          }
-
-          const updated =
-            (await response.json()) as StudentWithPhoto
-
-          setData((d) => ({
-            ...d,
-            students: d.students.map((s) =>
-              s.id === id
-                ? {
-                    ...updated,
-                    photoUrl: updated.photoUrl || '',
-                  }
-                : s
-            ),
-          }))
-        } catch (error) {
-          console.error('Failed to update student:', error)
-          throw error
-        }
-      },
-
-      deleteStudent: async (id) => {
-        try {
-          const response = await fetch(`/api/students/${id}`, {
-            method: 'DELETE',
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to delete student')
-          }
-
-          setData((d) => ({
-            ...d,
-            students: d.students.filter((s) => s.id !== id),
-          }))
-        } catch (error) {
-          console.error('Failed to delete student:', error)
-          throw error
-        }
-      },
-
-      addTeacher: async (t) => {
-        try {
-          const response = await fetch('/api/teachers', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(t),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to save teacher')
-          }
-
-          const teacher = await response.json()
-
-          setData((d) => ({
-            ...d,
-            teachers: [teacher, ...d.teachers],
-          }))
-        } catch (error) {
-          console.error('Failed to add teacher:', error)
-          throw error
-        }
-      },
-
-      updateTeacher: async (id, patch) => {
-        try {
-          const currentTeacher = data.teachers.find(
-            (t) => t.id === id
-          )
-
-          if (!currentTeacher) {
-            throw new Error('Teacher not found')
-          }
-
-          const updatedTeacher = {
-            ...currentTeacher,
-            ...patch,
-            id,
-          }
-
-          const response = await fetch(`/api/teachers/${id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatedTeacher),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to update teacher')
-          }
-
-          const updated = await response.json()
-
-          setData((d) => ({
-            ...d,
-            teachers: d.teachers.map((t) =>
-              t.id === id ? updated : t
-            ),
-          }))
-        } catch (error) {
-          console.error('Failed to update teacher:', error)
-          throw error
-        }
-      },
-
-      deleteTeacher: async (id) => {
-        try {
-          const response = await fetch(`/api/teachers/${id}`, {
-            method: 'DELETE',
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to delete teacher')
-          }
-
-          setData((d) => ({
-            ...d,
-            teachers: d.teachers.filter((t) => t.id !== id),
-          }))
-        } catch (error) {
-          console.error('Failed to delete teacher:', error)
-          throw error
-        }
-      },
-
-      addClass: async (c) => {
-        try {
-          const response = await fetch('/api/classes', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(c),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to save class')
-          }
-
-          const classData = await response.json()
-
-          setData((d) => ({
-            ...d,
-            classes: [...d.classes, classData],
-          }))
-        } catch (error) {
-          console.error('Failed to add class:', error)
-          throw error
-        }
-      },
-
-      addSubject: async (s) => {
-        try {
-          const response = await fetch('/api/subjects', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(s),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to save subject')
-          }
-
-          const subject = await response.json()
-
-          setData((d) => ({
-            ...d,
-            subjects: [...d.subjects, subject],
-          }))
-        } catch (error) {
-          console.error('Failed to add subject:', error)
-          throw error
-        }
-      },
-
-      setStudentAttendance: (date, records) =>
-        setData((d) => {
-          const others = d.studentAttendance.filter(
-            (a) =>
-              a.date !== date ||
-              !records.some(
-                (r) => r.studentId === a.studentId
-              )
-          )
-
-          const next = records.map((r) => ({
-            id: `att-${r.studentId}-${date}`,
-            studentId: r.studentId,
-            date,
-            status: r.status,
-          }))
-
-          return {
-            ...d,
-            studentAttendance: [...others, ...next],
-          }
-        }),
-
-      setTeacherAttendance: (date, records) =>
-        setData((d) => {
-          const others = d.teacherAttendance.filter(
-            (a) =>
-              a.date !== date ||
-              !records.some(
-                (r) => r.teacherId === a.teacherId
-              )
-          )
-
-          const next = records.map((r) => ({
-            id: `tatt-${r.teacherId}-${date}`,
-            teacherId: r.teacherId,
-            date,
-            status: r.status,
-          }))
-
-          return {
-            ...d,
-            teacherAttendance: [...others, ...next],
-          }
-        }),
-
-      addExam: async (e) => {
-        try {
-          const response = await fetch('/api/exams', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(e),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to save exam')
-          }
-
-          const responseData = await fetch('/api/exams')
-
-          if (!responseData.ok) {
-            throw new Error('Failed to reload exams')
-          }
-
-          const exams = await responseData.json()
-
-          setData((current) => ({
-            ...current,
-            exams,
-          }))
-        } catch (error) {
-          console.error('Failed to add exam:', error)
-          throw error
-        }
-      },
-
-      saveMarks: async (examId, entries) => {
-        try {
-          const response = await fetch('/api/marks', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              examId,
-              entries,
-            }),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to save marks')
-          }
-
-          const responseData = await fetch('/api/marks')
-
-          if (!responseData.ok) {
-            throw new Error('Failed to reload marks')
-          }
-
-          const marks = await responseData.json()
-
-          setData((current) => ({
-            ...current,
-            marks,
-          }))
-        } catch (error) {
-          console.error('Failed to save marks:', error)
-          throw error
-        }
-      },
-
-      addPayment: async (p) => {
-        try {
-          const response = await fetch('/api/payments', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(p),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to save payment')
-          }
-
-          const responseData = await fetch('/api/payments')
-
-          if (!responseData.ok) {
-            throw new Error('Failed to reload payments')
-          }
-
-          const payments = await responseData.json()
-
-          setData((d) => ({
-            ...d,
-            payments,
-          }))
-        } catch (error) {
-          console.error('Failed to add payment:', error)
-          throw error
-        }
-      },
+      role,
+      addStudent,
+      updateStudent,
+      deleteStudent,
+      addTeacher,
+      updateTeacher,
+      deleteTeacher,
+      addClass,
+      updateClass,
+      deleteClass,
+      addSubject,
+      updateSubject,
+      deleteSubject,
+      addExam,
+      updateExam,
+      deleteExam,
+      addPayment,
+      updateSchoolInfo,
+      saveAttendance,
     }),
-    [data, auth]
+    [data, role]
   )
 
   return (
-    <DataContext.Provider value={value}>
+    <SchoolContext.Provider value={value}>
       {children}
-    </DataContext.Provider>
+    </SchoolContext.Provider>
   )
 }
 
 export function useSchool() {
-  const ctx = useContext(DataContext)
+  const context = useContext(SchoolContext)
 
-  if (!ctx) {
-    throw new Error('useSchool must be used within DataProvider')
+  if (!context) {
+    throw new Error(
+      'useSchool must be used inside SchoolProvider'
+    )
   }
 
-  return ctx
-          }
+  return context
+}
