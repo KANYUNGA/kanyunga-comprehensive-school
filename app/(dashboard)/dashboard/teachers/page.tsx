@@ -500,4 +500,4 @@ export default function TeachersPage() {
     </div>
   )
 }
-```
+
