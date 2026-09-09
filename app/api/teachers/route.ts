@@ -1,4 +1,4 @@
-```ts
+
 import { getDb } from "@/lib/db"
 import { requireAdmin } from "@/lib/server-auth"
 
@@ -135,5 +135,4 @@ export async function POST(request: Request) {
     )
   }
 }
-```
         
