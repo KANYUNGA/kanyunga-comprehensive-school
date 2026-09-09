@@ -32,29 +32,23 @@ export async function GET() {
         id: String(s.id),
         admissionNo: s.admission_number ?? "",
         firstName: s.first_name ?? "",
+        middleName: s.middle_name ?? "",
         lastName: s.last_name ?? "",
         gender: s.gender ?? "Male",
-
-        // Neon stores the actual class name here.
         classId: s.class_name ?? "",
-
+        className: s.class_name ?? "",
         stream: s.stream ?? "",
-
         dateOfBirth: s.date_of_birth
           ? new Date(s.date_of_birth).toISOString().slice(0, 10)
           : "",
-
         guardianName: s.parent_name ?? "",
         guardianPhone: s.parent_phone ?? "",
+        address: s.address ?? "",
         email: "",
-
         admissionDate: s.admission_date
           ? new Date(s.admission_date).toISOString().slice(0, 10)
           : "",
-
         status: s.status ?? "Active",
-
-        // Learner photo
         photoUrl: s.photo_url ?? "",
       }))
     )
@@ -94,6 +88,7 @@ export async function POST(request: Request) {
       INSERT INTO students (
         admission_number,
         first_name,
+        middle_name,
         last_name,
         gender,
         date_of_birth,
@@ -101,6 +96,7 @@ export async function POST(request: Request) {
         stream,
         parent_name,
         parent_phone,
+        address,
         admission_date,
         status,
         photo_url
@@ -108,6 +104,7 @@ export async function POST(request: Request) {
       VALUES (
         ${student.admissionNo},
         ${student.firstName},
+        ${student.middleName || null},
         ${student.lastName},
         ${student.gender},
         ${student.dateOfBirth || null},
@@ -115,6 +112,7 @@ export async function POST(request: Request) {
         ${student.stream || ""},
         ${student.guardianName || ""},
         ${student.guardianPhone || ""},
+        ${student.address || null},
         ${student.admissionDate || null},
         ${student.status || "Active"},
         ${student.photoUrl || null}
@@ -134,7 +132,10 @@ export async function POST(request: Request) {
     console.error("Failed to create student:", error)
 
     return Response.json(
-      { error: "Failed to create student" },
+      {
+        error: "Failed to create student",
+        detail: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     )
   }
@@ -148,9 +149,16 @@ export async function PUT(request: Request) {
   }
 
   try {
+    const url = new URL(request.url)
+    const urlId = url.searchParams.get("id")
+
     const student = await request.json()
 
-    if (!student.id) {
+    // Accept the student ID from either ?id=123 or the request body.
+    const rawId = urlId || student.id
+    const studentId = Number(rawId)
+
+    if (!Number.isInteger(studentId) || studentId <= 0) {
       return Response.json(
         { error: "Student ID is required" },
         { status: 400 }
@@ -169,11 +177,12 @@ export async function PUT(request: Request) {
       )
     }
 
-    await sql`
+    const result = await sql`
       UPDATE students
       SET
         admission_number = ${student.admissionNo},
         first_name = ${student.firstName},
+        middle_name = ${student.middleName || null},
         last_name = ${student.lastName},
         gender = ${student.gender},
         date_of_birth = ${student.dateOfBirth || null},
@@ -181,21 +190,69 @@ export async function PUT(request: Request) {
         stream = ${student.stream || ""},
         parent_name = ${student.guardianName || ""},
         parent_phone = ${student.guardianPhone || ""},
+        address = ${student.address || null},
         admission_date = ${student.admissionDate || null},
         status = ${student.status || "Active"},
         photo_url = ${student.photoUrl || null}
-      WHERE id = ${Number(student.id)}
+      WHERE id = ${studentId}
+      RETURNING
+        id,
+        admission_number,
+        first_name,
+        middle_name,
+        last_name,
+        gender,
+        date_of_birth,
+        class_name,
+        stream,
+        parent_name,
+        parent_phone,
+        address,
+        admission_date,
+        status,
+        photo_url
     `
 
+    if (result.length === 0) {
+      return Response.json(
+        { error: "Student not found" },
+        { status: 404 }
+      )
+    }
+
+    const s = result[0]
+
     return Response.json({
-      success: true,
-      className,
+      id: String(s.id),
+      admissionNo: s.admission_number ?? "",
+      firstName: s.first_name ?? "",
+      middleName: s.middle_name ?? "",
+      lastName: s.last_name ?? "",
+      gender: s.gender ?? "Male",
+      classId: s.class_name ?? "",
+      className: s.class_name ?? "",
+      stream: s.stream ?? "",
+      dateOfBirth: s.date_of_birth
+        ? new Date(s.date_of_birth).toISOString().slice(0, 10)
+        : "",
+      guardianName: s.parent_name ?? "",
+      guardianPhone: s.parent_phone ?? "",
+      address: s.address ?? "",
+      email: "",
+      admissionDate: s.admission_date
+        ? new Date(s.admission_date).toISOString().slice(0, 10)
+        : "",
+      status: s.status ?? "Active",
+      photoUrl: s.photo_url ?? "",
     })
   } catch (error) {
     console.error("Failed to update student:", error)
 
     return Response.json(
-      { error: "Failed to update student" },
+      {
+        error: "Failed to update student",
+        detail: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     )
   }
@@ -209,19 +266,33 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const { id } = await request.json()
+    const url = new URL(request.url)
+    const urlId = url.searchParams.get("id")
 
-    if (!id) {
+    const body = await request.json().catch(() => ({}))
+    const rawId = urlId || body.id
+
+    const studentId = Number(rawId)
+
+    if (!Number.isInteger(studentId) || studentId <= 0) {
       return Response.json(
         { error: "Student ID is required" },
         { status: 400 }
       )
     }
 
-    await sql`
+    const result = await sql`
       DELETE FROM students
-      WHERE id = ${Number(id)}
+      WHERE id = ${studentId}
+      RETURNING id
     `
+
+    if (result.length === 0) {
+      return Response.json(
+        { error: "Student not found" },
+        { status: 404 }
+      )
+    }
 
     return Response.json({ success: true })
   } catch (error) {
@@ -232,4 +303,4 @@ export async function DELETE(request: Request) {
       { status: 500 }
     )
   }
-  }
+}
