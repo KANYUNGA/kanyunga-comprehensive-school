@@ -21,6 +21,7 @@ export async function GET() {
         address,
         admission_date,
         status,
+        photo_url,
         created_at
       FROM students
       ORDER BY id
@@ -34,7 +35,6 @@ export async function GET() {
         lastName: s.last_name ?? "",
         gender: s.gender ?? "Male",
 
-        // IMPORTANT:
         // Neon stores the actual class name here.
         classId: s.class_name ?? "",
 
@@ -53,6 +53,9 @@ export async function GET() {
           : "",
 
         status: s.status ?? "Active",
+
+        // Learner photo
+        photoUrl: s.photo_url ?? "",
       }))
     )
   } catch (error) {
@@ -75,8 +78,6 @@ export async function POST(request: Request) {
   try {
     const student = await request.json()
 
-    // Accept className from the new StudentDialog.
-    // Keep classId as a fallback for older code.
     const className =
       student.className?.toString().trim() ||
       student.classId?.toString().trim() ||
@@ -101,7 +102,8 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         admission_date,
-        status
+        status,
+        photo_url
       )
       VALUES (
         ${student.admissionNo},
@@ -114,7 +116,8 @@ export async function POST(request: Request) {
         ${student.guardianName || ""},
         ${student.guardianPhone || ""},
         ${student.admissionDate || null},
-        ${student.status || "Active"}
+        ${student.status || "Active"},
+        ${student.photoUrl || null}
       )
       RETURNING id
     `
@@ -154,7 +157,6 @@ export async function PUT(request: Request) {
       )
     }
 
-    // Accept className from StudentDialog.
     const className =
       student.className?.toString().trim() ||
       student.classId?.toString().trim() ||
@@ -180,7 +182,8 @@ export async function PUT(request: Request) {
         parent_name = ${student.guardianName || ""},
         parent_phone = ${student.guardianPhone || ""},
         admission_date = ${student.admissionDate || null},
-        status = ${student.status || "Active"}
+        status = ${student.status || "Active"},
+        photo_url = ${student.photoUrl || null}
       WHERE id = ${Number(student.id)}
     `
 
@@ -229,4 +232,4 @@ export async function DELETE(request: Request) {
       { status: 500 }
     )
   }
-}
+  }
