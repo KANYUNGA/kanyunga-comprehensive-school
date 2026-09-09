@@ -21,7 +21,9 @@ import {
 } from '@/components/ui/select'
 import type { Gender, Student } from '@/lib/data'
 
-type Draft = Omit<Student, 'id'>
+type Draft = Omit<Student, 'id'> & {
+  photoUrl?: string
+}
 
 const SCHOOL_CLASSES = [
   'Play Group',
@@ -66,6 +68,7 @@ const empty = (className: string): Draft => ({
   email: '',
   admissionDate: new Date().toISOString().slice(0, 10),
   status: 'Active',
+  photoUrl: '',
 })
 
 export function StudentDialog({
@@ -92,6 +95,8 @@ export function StudentDialog({
         ...rest,
         classId: rest.classId || 'Play Group',
         stream: rest.stream || 'Main',
+        photoUrl:
+          (student as Student & { photoUrl?: string }).photoUrl || '',
       })
     } else {
       setDraft(empty('Play Group'))
@@ -113,6 +118,39 @@ export function StudentDialog({
       ...d,
       [key]: value,
     }))
+  }
+
+  function handlePhotoChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file.')
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Photo must be smaller than 2 MB.')
+      return
+    }
+
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      set('photoUrl', String(reader.result))
+      setError('')
+    }
+
+    reader.onerror = () => {
+      setError('Unable to read the selected photo.')
+    }
+
+    reader.readAsDataURL(file)
   }
 
   async function handleSave() {
@@ -139,8 +177,6 @@ export function StudentDialog({
         lastName: draft.lastName.trim(),
         gender: draft.gender,
 
-        // IMPORTANT:
-        // classId and className are BOTH the actual class name.
         classId: draft.classId,
         className: draft.classId,
 
@@ -155,6 +191,8 @@ export function StudentDialog({
         admissionDate: draft.admissionDate || null,
 
         status: draft.status || 'Active',
+
+        photoUrl: draft.photoUrl || null,
       }
 
       const response = await fetch(
@@ -213,6 +251,44 @@ export function StudentDialog({
               : 'Enter the student details to enrol them.'}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-col items-center gap-3 py-2">
+          <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border bg-muted">
+            {draft.photoUrl ? (
+              <img
+                src={draft.photoUrl}
+                alt="Learner preview"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-3xl font-semibold text-muted-foreground">
+                {draft.firstName?.[0] ?? 'L'}
+                {draft.lastName?.[0] ?? ''}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <Label
+              htmlFor="learner-photo"
+              className="cursor-pointer rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              📷 {draft.photoUrl ? 'Change Photo' : 'Upload Photo'}
+            </Label>
+
+            <Input
+              id="learner-photo"
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoChange}
+              className="hidden"
+            />
+
+            <p className="text-xs text-muted-foreground">
+              JPG, PNG or other image · Maximum 2 MB
+            </p>
+          </div>
+        </div>
 
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <Field label="First name">
@@ -419,4 +495,4 @@ function Field({
       {children}
     </div>
   )
-}
+      }
