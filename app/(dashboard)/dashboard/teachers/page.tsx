@@ -163,8 +163,8 @@ export default function TeachersPage() {
 
   async function handleDelete(teacher: Teacher) {
     const confirmed = window.confirm(
-      `Are you sure you want to remove ${teacherName(teacher)}?`
-    )
+  `Are you sure you want to remove ${teacherName(teacher)}?`
+)
 
     if (!confirmed) return
 
