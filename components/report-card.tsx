@@ -1,183 +1,310 @@
+
 'use client'
 
-import { useMemo } from 'react'
-import Image from 'next/image'
+import { useEffect, useMemo, useState } from 'react'
 import { useSchool } from '@/lib/store'
-import { studentName } from '@/lib/data'
-import { getGrade, gradeColor, meanGradeFromPoints } from '@/lib/grading'
+import { ReportCard } from '@/components/report-card'
+import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { cn } from '@/lib/utils'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { studentName } from '@/lib/data'
+import { Printer } from 'lucide-react'
 
-export function ReportCard({ studentId, examId }: { studentId: string; examId: string }) {
+const TERMS = ['Term 1', 'Term 2', 'Term 3']
+
+export default function ReportsPage() {
   const { data } = useSchool()
 
-  const student = data.students.find((s) => s.id === studentId)
-  const exam = data.exams.find((e) => e.id === examId)
-  const cls = data.classes.find((c) => c.id === student?.classId)
+  const [classId, setClassId] = useState('')
+  const [studentId, setStudentId] = useState('')
+  const [term, setTerm] = useState('Term 1')
+  const [examId, setExamId] = useState('')
 
-  const rows = useMemo(() => {
-    if (!student) return []
-    return data.marks
-      .filter((m) => m.examId === examId && m.studentId === studentId)
-      .map((m) => {
-        const subject = data.subjects.find((s) => s.id === m.subjectId)
-        const g = getGrade(m.score)
-        return { subject: subject?.name ?? m.subjectId, score: m.score, ...g }
-      })
-      .sort((a, b) => a.subject.localeCompare(b.subject))
-  }, [data.marks, data.subjects, examId, studentId, student])
+  /*
+   * Classes are loaded from the database by the SchoolProvider.
+   * Once they arrive, automatically select the first class.
+   */
+  useEffect(() => {
+    if (!classId && data.classes.length > 0) {
+      setClassId(data.classes[0].id)
+    }
+  }, [data.classes, classId])
 
-  const summary = useMemo(() => {
-    const total = rows.reduce((sum, r) => sum + r.score, 0)
-    const count = rows.length
-    const avg = count ? total / count : 0
-    const avgPoints = count ? rows.reduce((sum, r) => sum + r.points, 0) / count : 0
-    return { total, count, avg, meanGrade: meanGradeFromPoints(avgPoints) }
-  }, [rows])
+  /*
+   * Students belonging to the selected class.
+   */
+  const roster = useMemo(() => {
+    if (!classId) return []
 
-  // class position
-  const position = useMemo(() => {
-    if (!student) return { rank: 0, outOf: 0 }
-    const classmates = data.students.filter((s) => s.classId === student.classId)
-    const averages = classmates
-      .map((s) => {
-        const ms = data.marks.filter((m) => m.examId === examId && m.studentId === s.id)
-        const avg = ms.length ? ms.reduce((sum, m) => sum + m.score, 0) / ms.length : -1
-        return { id: s.id, avg }
-      })
-      .filter((a) => a.avg >= 0)
-      .sort((a, b) => b.avg - a.avg)
-    const rank = averages.findIndex((a) => a.id === student.id) + 1
-    return { rank, outOf: averages.length }
-  }, [data.students, data.marks, examId, student])
+    return data.students.filter(
+      (student) =>
+        student.classId === classId &&
+        student.status === 'Active',
+    )
+  }, [data.students, classId])
 
-  if (!student || !exam) return null
+  /*
+   * When the class changes, automatically select the
+   * first active student in that class.
+   */
+  useEffect(() => {
+    if (roster.length === 0) {
+      setStudentId('')
+      return
+    }
 
-  return (
-    <Card className="mx-auto w-full max-w-3xl print:border-0 print:shadow-none">
-      <CardContent className="pt-6">
-        {/* header */}
-        <div className="flex items-center gap-4 border-b pb-4">
-          <Image src="/school-crest.png" alt="School crest" width={64} height={64} className="size-16 object-contain" />
-          <div className="flex-1">
-            <h2 className="font-heading text-xl font-bold text-primary">{data.school.name}</h2>
-            <p className="text-sm text-muted-foreground">{data.school.poBox}</p>
-            <p className="text-sm text-muted-foreground">
-              {data.school.phone} · {data.school.email}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-heading text-sm font-semibold">TERMINAL REPORT</p>
-            <p className="text-sm text-muted-foreground">
-              {exam.term} {exam.year}
-            </p>
-          </div>
-        </div>
+    const studentStillExists = roster.some(
+      (student) => student.id === studentId,
+    )
 
-        {/* student info */}
-        <div className="grid gap-x-8 gap-y-1.5 py-4 text-sm sm:grid-cols-2">
-          <InfoRow label="Name" value={studentName(student)} />
-          <InfoRow label="Admission No" value={student.admissionNo} />
-          <InfoRow label="Class" value={`${cls?.name ?? ''} ${student.stream}`} />
-          <InfoRow label="Exam" value={exam.name} />
-          <InfoRow
-            label="Position"
-            value={position.rank ? `${position.rank} out of ${position.outOf}` : 'N/A'}
-          />
-          <InfoRow label="Mean Grade" value={summary.meanGrade} />
-        </div>
+    if (!studentStillExists) {
+      setStudentId(roster[0].id)
+    }
+  }, [roster, studentId])
 
-        {/* marks table */}
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Subject</TableHead>
-              <TableHead className="text-right">Marks</TableHead>
-              <TableHead className="text-right">Grade</TableHead>
-              <TableHead className="text-right">Points</TableHead>
-              <TableHead>Remark</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.subject}>
-                <TableCell className="font-medium">{r.subject}</TableCell>
-                <TableCell className="text-right tabular-nums">{r.score}</TableCell>
-                <TableCell className="text-right">
-                  <Badge variant="outline" className={cn('font-mono', gradeColor(r.grade))}>
-                    {r.grade}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{r.points}</TableCell>
-                <TableCell className="text-muted-foreground">{r.remark}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+  /*
+   * Exams belonging to the selected term and year.
+   *
+   * This supports:
+   * - one exam in a term
+   * - several exams in a term
+   * - no exam yet in a term
+   */
+  const termExams = useMemo(() => {
+    return data.exams
+      .filter(
+        (exam) =>
+          exam.term === term &&
+          exam.year === data.school.currentYear,
+      )
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [data.exams, data.school.currentYear, term])
 
-        {/* summary */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <SummaryBox label="Total Marks" value={`${summary.total} / ${summary.count * 100}`} />
-          <SummaryBox label="Average" value={`${summary.avg.toFixed(1)}%`} />
-          <SummaryBox label="Mean Grade" value={summary.meanGrade} highlight />
-        </div>
+  /*
+   * When the term changes, select the first available exam.
+   * If there is only one exam, it is automatically selected.
+   */
+  useEffect(() => {
+    if (termExams.length === 0) {
+      setExamId('')
+      return
+    }
 
-        {/* remarks */}
-        <div className="mt-6 space-y-3 text-sm">
-          <div className="flex gap-2">
-            <span className="w-36 shrink-0 font-medium">Class Teacher&apos;s Remark:</span>
-            <span className="flex-1 border-b border-dashed text-muted-foreground">
-              {summary.avg >= 60
-                ? 'A commendable performance. Keep it up.'
-                : summary.avg >= 45
-                  ? 'Fair effort. More consistency needed.'
-                  : 'Needs to work harder next term.'}
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-36 shrink-0 font-medium">Principal&apos;s Remark:</span>
-            <span className="flex-1 border-b border-dashed text-muted-foreground">
-              {data.school.motto}
-            </span>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <span className="w-36 shrink-0 font-medium">Closing Date:</span>
-            <span className="flex-1 border-b border-dashed" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    const selectedExamStillExists = termExams.some(
+      (exam) => exam.id === examId,
+    )
+
+    if (!selectedExamStillExists) {
+      setExamId(termExams[0].id)
+    }
+  }, [termExams, examId])
+
+  const activeStudentId = roster.some(
+    (student) => student.id === studentId,
   )
-}
+    ? studentId
+    : roster[0]?.id ?? ''
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex gap-2">
-      <span className="w-28 shrink-0 text-muted-foreground">{label}:</span>
-      <span className="font-medium">{value}</span>
-    </div>
+  const selectedExam = termExams.find(
+    (exam) => exam.id === examId,
   )
-}
 
-function SummaryBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div
-      className={cn(
-        'rounded-lg border p-3 text-center',
-        highlight ? 'border-primary bg-primary/5' : 'bg-muted/40',
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Student Report Forms"
+        description="Generate end-of-term report cards with automatic grading."
+        actions={
+          <Button
+            onClick={() => window.print()}
+            className="print:hidden"
+            disabled={!activeStudentId || !selectedExam}
+          >
+            <Printer className="size-4" />
+            Print
+          </Button>
+        }
+      />
+
+      <Card className="print:hidden">
+        <CardContent className="flex flex-wrap gap-4 pt-6">
+          {/* CLASS */}
+          <div className="flex flex-col gap-2">
+            <Label>Class</Label>
+
+            <Select
+              value={classId}
+              onValueChange={(value) => {
+                setClassId(value)
+                setStudentId('')
+              }}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select class" />
+              </SelectTrigger>
+
+              <SelectContent>
+                {data.classes.length > 0 ? (
+                  data.classes.map((cls) => (
+                    <SelectItem
+                      key={cls.id}
+                      value={cls.id}
+                    >
+                      {cls.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-classes" disabled>
+                    No classes available
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* STUDENT */}
+          <div className="flex flex-col gap-2">
+            <Label>Student</Label>
+
+            <Select
+              value={activeStudentId}
+              onValueChange={(value) => setStudentId(value)}
+              disabled={roster.length === 0}
+            >
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select student" />
+              </SelectTrigger>
+
+              <SelectContent>
+                {roster.map((student) => (
+                  <SelectItem
+                    key={student.id}
+                    value={student.id}
+                  >
+                    {studentName(student)} · {student.admissionNo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* TERM */}
+          <div className="flex flex-col gap-2">
+            <Label>Term</Label>
+
+            <Select
+              value={term}
+              onValueChange={(value) => {
+                setTerm(value)
+                setExamId('')
+              }}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Select term" />
+              </SelectTrigger>
+
+              <SelectContent>
+                {TERMS.map((termName) => (
+                  <SelectItem
+                    key={termName}
+                    value={termName}
+                  >
+                    {termName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* EXAM */}
+          <div className="flex flex-col gap-2">
+            <Label>Exam</Label>
+
+            <Select
+              value={examId}
+              onValueChange={(value) => setExamId(value)}
+              disabled={termExams.length === 0}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue
+                  placeholder={
+                    termExams.length === 0
+                      ? 'No exam available'
+                      : 'Select exam'
+                  }
+                />
+              </SelectTrigger>
+
+              <SelectContent>
+                {termExams.map((exam) => (
+                  <SelectItem
+                    key={exam.id}
+                    value={exam.id}
+                  >
+                    {exam.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* NO CLASS */}
+      {data.classes.length === 0 && (
+        <Card className="print:hidden">
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">
+              No classes have been added yet.
+            </p>
+          </CardContent>
+        </Card>
       )}
-    >
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn('mt-0.5 font-heading text-lg font-bold', highlight && 'text-primary')}>{value}</p>
+
+      {/* NO STUDENTS */}
+      {classId && roster.length === 0 && (
+        <Card className="print:hidden">
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">
+              No active students found in this class.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* NO EXAM */}
+      {classId &&
+        roster.length > 0 &&
+        termExams.length === 0 && (
+          <Card className="print:hidden">
+            <CardContent className="pt-6">
+              <p className="font-medium">
+                No {term} exam has been added yet.
+              </p>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add an exam for {term} in the Examination section,
+                then enter the students&apos; marks.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+      {/* REPORT */}
+      {activeStudentId && selectedExam ? (
+        <ReportCard
+          studentId={activeStudentId}
+          examId={selectedExam.id}
+        />
+      ) : null}
     </div>
   )
 }
