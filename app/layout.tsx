@@ -1,7 +1,8 @@
+
 import type { Metadata, Viewport } from 'next'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
-import { DataProvider } from '@/lib/store'
+import { SchoolProvider } from '@/lib/store'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -38,7 +39,7 @@ export default function RootLayout({
       className={`${inter.variable} ${jakarta.variable} bg-background`}
     >
       <body className="font-sans antialiased">
-        <DataProvider>{children}</DataProvider>
+        <SchoolProvider>{children}</SchoolProvider>
       </body>
     </html>
   )
