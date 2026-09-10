@@ -13,7 +13,6 @@ import {
 import {
   createSampleData,
   type AttendanceStatus,
-  type ClassLevel,
   type Exam,
   type Payment,
   type SchoolData,
@@ -29,9 +28,18 @@ type StudentWithPhoto = Student & {
   photoUrl?: string
 }
 
+type LoginData = {
+  role: Role
+  name: string
+  studentId?: string
+}
+
 type SchoolContextValue = {
   data: SchoolData
   role: Role
+
+  login: (user: LoginData) => void
+  logout: () => void
 
   addStudent: (student: Student) => Promise<void>
   updateStudent: (student: Student) => Promise<void>
@@ -167,7 +175,10 @@ export function SchoolProvider({
   children: ReactNode
 }) {
   const [data, setData] = useState<SchoolData>(() => createSampleData())
-  const [role] = useState<Role>('admin')
+
+  const [role, setRole] = useState<Role>('admin')
+
+  const [loggedIn, setLoggedIn] = useState(false)
 
   const loadData = async () => {
     try {
@@ -305,7 +316,67 @@ export function SchoolProvider({
 
   useEffect(() => {
     loadData()
+
+    try {
+      const savedUser = localStorage.getItem(
+        'kanyunga-user'
+      )
+
+      if (savedUser) {
+        const user = JSON.parse(savedUser)
+
+        if (user?.role) {
+          setRole(
+            String(user.role).toLowerCase() as Role
+          )
+          setLoggedIn(true)
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Failed to restore login session:',
+        error
+      )
+    }
   }, [])
+
+  const login = (user: LoginData) => {
+    const normalizedRole =
+      String(user.role).toLowerCase() as Role
+
+    setRole(normalizedRole)
+    setLoggedIn(true)
+
+    try {
+      localStorage.setItem(
+        'kanyunga-user',
+        JSON.stringify({
+          role: normalizedRole,
+          name: user.name,
+          studentId: user.studentId,
+        })
+      )
+    } catch (error) {
+      console.error(
+        'Failed to save login session:',
+        error
+      )
+    }
+  }
+
+  const logout = () => {
+    setLoggedIn(false)
+    setRole('admin')
+
+    try {
+      localStorage.removeItem('kanyunga-user')
+    } catch (error) {
+      console.error(
+        'Failed to clear login session:',
+        error
+      )
+    }
+  }
 
   const addStudent = async (student: Student) => {
     const response = await fetch('/api/students', {
@@ -614,6 +685,8 @@ export function SchoolProvider({
     () => ({
       data,
       role,
+      login,
+      logout,
       addStudent,
       updateStudent,
       deleteStudent,
@@ -633,7 +706,7 @@ export function SchoolProvider({
       updateSchoolInfo,
       saveAttendance,
     }),
-    [data, role]
+    [data, role, loggedIn]
   )
 
   return (
@@ -653,4 +726,4 @@ export function useSchool() {
   }
 
   return context
-}                           
+}
