@@ -57,7 +57,6 @@ const subject = data.subjects.find(
 (item) => item.id === mark.subjectId,
 )
 
-```
     return {
       ...mark,
       subjectName: subject?.name ?? 'Unknown Subject',
@@ -67,7 +66,6 @@ const subject = data.subjects.find(
   .sort((a, b) =>
     a.subjectName.localeCompare(b.subjectName),
   )
-```
 
 }, [data.marks, data.subjects, studentId, examId])
 
@@ -84,7 +82,6 @@ marks.length > 0
 const position = useMemo(() => {
 if (!student) return null
 
-```
 const classStudents = data.students.filter(
   (item) =>
     item.classId === student.classId &&
@@ -118,7 +115,6 @@ const index = totals.findIndex(
 if (index === -1) return null
 
 return `${index + 1} / ${totals.length}`
-```
 
 }, [
 data.students,
@@ -137,7 +133,6 @@ Student or examination not found. </div>
 return ( <div className="mx-auto w-full max-w-4xl rounded-lg border bg-background p-6 print:border-0 print:shadow-none"> <div className="mb-6 text-center"> <h1 className="text-2xl font-bold">
 KANYUNGA COMPREHENSIVE SCHOOL </h1>
 
-```
     <p className="mt-1 text-sm">
       Student Academic Report
     </p>
@@ -315,7 +310,6 @@ KANYUNGA COMPREHENSIVE SCHOOL </h1>
     </div>
   </div>
 </div>
-```
 
 )
                       }
