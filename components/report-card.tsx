@@ -1,310 +1,322 @@
-
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useSchool } from '@/lib/store'
-import { ReportCard } from '@/components/report-card'
-import { PageHeader } from '@/components/page-header'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { studentName } from '@/lib/data'
-import { Printer } from 'lucide-react'
 
-const TERMS = ['Term 1', 'Term 2', 'Term 3']
-
-export default function ReportsPage() {
-  const { data } = useSchool()
-
-  const [classId, setClassId] = useState('')
-  const [studentId, setStudentId] = useState('')
-  const [term, setTerm] = useState('Term 1')
-  const [examId, setExamId] = useState('')
-
-  /*
-   * Classes are loaded from the database by the SchoolProvider.
-   * Once they arrive, automatically select the first class.
-   */
-  useEffect(() => {
-    if (!classId && data.classes.length > 0) {
-      setClassId(data.classes[0].id)
-    }
-  }, [data.classes, classId])
-
-  /*
-   * Students belonging to the selected class.
-   */
-  const roster = useMemo(() => {
-    if (!classId) return []
-
-    return data.students.filter(
-      (student) =>
-        student.classId === classId &&
-        student.status === 'Active',
-    )
-  }, [data.students, classId])
-
-  /*
-   * When the class changes, automatically select the
-   * first active student in that class.
-   */
-  useEffect(() => {
-    if (roster.length === 0) {
-      setStudentId('')
-      return
-    }
-
-    const studentStillExists = roster.some(
-      (student) => student.id === studentId,
-    )
-
-    if (!studentStillExists) {
-      setStudentId(roster[0].id)
-    }
-  }, [roster, studentId])
-
-  /*
-   * Exams belonging to the selected term and year.
-   *
-   * This supports:
-   * - one exam in a term
-   * - several exams in a term
-   * - no exam yet in a term
-   */
-  const termExams = useMemo(() => {
-    return data.exams
-      .filter(
-        (exam) =>
-          exam.term === term &&
-          exam.year === data.school.currentYear,
-      )
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [data.exams, data.school.currentYear, term])
-
-  /*
-   * When the term changes, select the first available exam.
-   * If there is only one exam, it is automatically selected.
-   */
-  useEffect(() => {
-    if (termExams.length === 0) {
-      setExamId('')
-      return
-    }
-
-    const selectedExamStillExists = termExams.some(
-      (exam) => exam.id === examId,
-    )
-
-    if (!selectedExamStillExists) {
-      setExamId(termExams[0].id)
-    }
-  }, [termExams, examId])
-
-  const activeStudentId = roster.some(
-    (student) => student.id === studentId,
-  )
-    ? studentId
-    : roster[0]?.id ?? ''
-
-  const selectedExam = termExams.find(
-    (exam) => exam.id === examId,
-  )
-
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Student Report Forms"
-        description="Generate end-of-term report cards with automatic grading."
-        actions={
-          <Button
-            onClick={() => window.print()}
-            className="print:hidden"
-            disabled={!activeStudentId || !selectedExam}
-          >
-            <Printer className="size-4" />
-            Print
-          </Button>
-        }
-      />
-
-      <Card className="print:hidden">
-        <CardContent className="flex flex-wrap gap-4 pt-6">
-          {/* CLASS */}
-          <div className="flex flex-col gap-2">
-            <Label>Class</Label>
-
-            <Select
-              value={classId}
-              onValueChange={(value) => {
-                setClassId(value)
-                setStudentId('')
-              }}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select class" />
-              </SelectTrigger>
-
-              <SelectContent>
-                {data.classes.length > 0 ? (
-                  data.classes.map((cls) => (
-                    <SelectItem
-                      key={cls.id}
-                      value={cls.id}
-                    >
-                      {cls.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="no-classes" disabled>
-                    No classes available
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* STUDENT */}
-          <div className="flex flex-col gap-2">
-            <Label>Student</Label>
-
-            <Select
-              value={activeStudentId}
-              onValueChange={(value) => setStudentId(value)}
-              disabled={roster.length === 0}
-            >
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Select student" />
-              </SelectTrigger>
-
-              <SelectContent>
-                {roster.map((student) => (
-                  <SelectItem
-                    key={student.id}
-                    value={student.id}
-                  >
-                    {studentName(student)} · {student.admissionNo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* TERM */}
-          <div className="flex flex-col gap-2">
-            <Label>Term</Label>
-
-            <Select
-              value={term}
-              onValueChange={(value) => {
-                setTerm(value)
-                setExamId('')
-              }}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Select term" />
-              </SelectTrigger>
-
-              <SelectContent>
-                {TERMS.map((termName) => (
-                  <SelectItem
-                    key={termName}
-                    value={termName}
-                  >
-                    {termName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* EXAM */}
-          <div className="flex flex-col gap-2">
-            <Label>Exam</Label>
-
-            <Select
-              value={examId}
-              onValueChange={(value) => setExamId(value)}
-              disabled={termExams.length === 0}
-            >
-              <SelectTrigger className="w-56">
-                <SelectValue
-                  placeholder={
-                    termExams.length === 0
-                      ? 'No exam available'
-                      : 'Select exam'
-                  }
-                />
-              </SelectTrigger>
-
-              <SelectContent>
-                {termExams.map((exam) => (
-                  <SelectItem
-                    key={exam.id}
-                    value={exam.id}
-                  >
-                    {exam.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* NO CLASS */}
-      {data.classes.length === 0 && (
-        <Card className="print:hidden">
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground">
-              No classes have been added yet.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* NO STUDENTS */}
-      {classId && roster.length === 0 && (
-        <Card className="print:hidden">
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground">
-              No active students found in this class.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* NO EXAM */}
-      {classId &&
-        roster.length > 0 &&
-        termExams.length === 0 && (
-          <Card className="print:hidden">
-            <CardContent className="pt-6">
-              <p className="font-medium">
-                No {term} exam has been added yet.
-              </p>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Add an exam for {term} in the Examination section,
-                then enter the students&apos; marks.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-      {/* REPORT */}
-      {activeStudentId && selectedExam ? (
-        <ReportCard
-          studentId={activeStudentId}
-          examId={selectedExam.id}
-        />
-      ) : null}
-    </div>
-  )
+type ReportCardProps = {
+studentId: string
+examId: string
 }
+
+function performanceLevel(score: number) {
+if (score >= 76) return 'AL8'
+if (score >= 71) return 'AL7'
+if (score >= 61) return 'AL6'
+if (score >= 51) return 'AL5'
+if (score >= 41) return 'AL4'
+if (score >= 31) return 'AL3'
+if (score >= 21) return 'AL2'
+return 'AL1'
+}
+
+function performanceDescription(score: number) {
+if (score >= 76) return 'Exceeding Expectations'
+if (score >= 61) return 'Meeting Expectations'
+if (score >= 41) return 'Approaching Expectations'
+return 'Below Expectations'
+}
+
+export function ReportCard({
+studentId,
+examId,
+}: ReportCardProps) {
+const { data } = useSchool()
+
+const student = data.students.find(
+(item) => item.id === studentId,
+)
+
+const exam = data.exams.find(
+(item) => item.id === examId,
+)
+
+const schoolClass = data.classes.find(
+(item) => item.id === student?.classId,
+)
+
+const marks = useMemo(() => {
+return data.marks
+.filter(
+(mark) =>
+mark.studentId === studentId &&
+mark.examId === examId,
+)
+.map((mark) => {
+const subject = data.subjects.find(
+(item) => item.id === mark.subjectId,
+)
+
+```
+    return {
+      ...mark,
+      subjectName: subject?.name ?? 'Unknown Subject',
+      score: Number(mark.score ?? 0),
+    }
+  })
+  .sort((a, b) =>
+    a.subjectName.localeCompare(b.subjectName),
+  )
+```
+
+}, [data.marks, data.subjects, studentId, examId])
+
+const total = marks.reduce(
+(sum, mark) => sum + mark.score,
+0,
+)
+
+const mean =
+marks.length > 0
+? total / marks.length
+: 0
+
+const position = useMemo(() => {
+if (!student) return null
+
+```
+const classStudents = data.students.filter(
+  (item) =>
+    item.classId === student.classId &&
+    item.status === 'Active',
+)
+
+const totals = classStudents
+  .map((classStudent) => {
+    const studentMarks = data.marks.filter(
+      (mark) =>
+        mark.studentId === classStudent.id &&
+        mark.examId === examId,
+    )
+
+    return {
+      studentId: classStudent.id,
+      total: studentMarks.reduce(
+        (sum, mark) =>
+          sum + Number(mark.score ?? 0),
+        0,
+      ),
+    }
+  })
+  .filter((item) => item.total > 0)
+  .sort((a, b) => b.total - a.total)
+
+const index = totals.findIndex(
+  (item) => item.studentId === studentId,
+)
+
+if (index === -1) return null
+
+return `${index + 1} / ${totals.length}`
+```
+
+}, [
+data.students,
+data.marks,
+student,
+examId,
+studentId,
+])
+
+if (!student || !exam) {
+return ( <div className="rounded-lg border p-6 text-center">
+Student or examination not found. </div>
+)
+}
+
+return ( <div className="mx-auto w-full max-w-4xl rounded-lg border bg-background p-6 print:border-0 print:shadow-none"> <div className="mb-6 text-center"> <h1 className="text-2xl font-bold">
+KANYUNGA COMPREHENSIVE SCHOOL </h1>
+
+```
+    <p className="mt-1 text-sm">
+      Student Academic Report
+    </p>
+
+    <p className="mt-2 font-semibold">
+      {exam.name} — {exam.term} {exam.year}
+    </p>
+  </div>
+
+  <div className="mb-6 grid grid-cols-1 gap-3 rounded-lg border p-4 sm:grid-cols-2">
+    <div>
+      <strong>Student:</strong>{' '}
+      {studentName(student)}
+    </div>
+
+    <div>
+      <strong>Admission No:</strong>{' '}
+      {student.admissionNo}
+    </div>
+
+    <div>
+      <strong>Class:</strong>{' '}
+      {schoolClass?.name ?? student.classId}
+    </div>
+
+    <div>
+      <strong>Stream:</strong>{' '}
+      {student.stream || '—'}
+    </div>
+
+    <div>
+      <strong>Gender:</strong>{' '}
+      {student.gender}
+    </div>
+
+    <div>
+      <strong>Position:</strong>{' '}
+      {position ?? '—'}
+    </div>
+  </div>
+
+  <div className="overflow-x-auto">
+    <table className="w-full border-collapse border">
+      <thead>
+        <tr>
+          <th className="border p-2 text-left">
+            No.
+          </th>
+
+          <th className="border p-2 text-left">
+            Learning Area / Subject
+          </th>
+
+          <th className="border p-2 text-center">
+            Score
+          </th>
+
+          <th className="border p-2 text-center">
+            Achievement Level
+          </th>
+
+          <th className="border p-2 text-left">
+            Descriptor
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {marks.length > 0 ? (
+          marks.map((mark, index) => (
+            <tr key={mark.id}>
+              <td className="border p-2">
+                {index + 1}
+              </td>
+
+              <td className="border p-2">
+                {mark.subjectName}
+              </td>
+
+              <td className="border p-2 text-center">
+                {mark.score}
+              </td>
+
+              <td className="border p-2 text-center font-semibold">
+                {performanceLevel(mark.score)}
+              </td>
+
+              <td className="border p-2">
+                {performanceDescription(mark.score)}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td
+              colSpan={5}
+              className="border p-6 text-center"
+            >
+              No marks have been entered for this
+              examination.
+            </td>
+          </tr>
+        )}
+      </tbody>
+
+      <tfoot>
+        <tr className="font-semibold">
+          <td
+            colSpan={2}
+            className="border p-2 text-right"
+          >
+            Total
+          </td>
+
+          <td className="border p-2 text-center">
+            {total}
+          </td>
+
+          <td
+            colSpan={2}
+            className="border p-2"
+          >
+            Mean Score:{' '}
+            {mean.toFixed(2)}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="rounded-lg border p-4">
+      <p className="text-sm text-muted-foreground">
+        Total Marks
+      </p>
+      <p className="text-xl font-bold">
+        {total}
+      </p>
+    </div>
+
+    <div className="rounded-lg border p-4">
+      <p className="text-sm text-muted-foreground">
+        Mean Score
+      </p>
+      <p className="text-xl font-bold">
+        {mean.toFixed(2)}
+      </p>
+    </div>
+
+    <div className="rounded-lg border p-4">
+      <p className="text-sm text-muted-foreground">
+        Overall Level
+      </p>
+      <p className="text-xl font-bold">
+        {marks.length > 0
+          ? performanceLevel(mean)
+          : '—'}
+      </p>
+    </div>
+  </div>
+
+  <div className="mt-10 grid grid-cols-2 gap-10 text-center">
+    <div>
+      <div className="border-b" />
+      <p className="mt-2 text-sm">
+        Class Teacher
+      </p>
+    </div>
+
+    <div>
+      <div className="border-b" />
+      <p className="mt-2 text-sm">
+        Head of Institution
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+)
+                      }
+      
