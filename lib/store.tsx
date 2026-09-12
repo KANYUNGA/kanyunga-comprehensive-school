@@ -177,7 +177,6 @@ const studentClassId = String(
 student.classId ?? ''
 ).trim()
 
-```
 const studentClassName = String(
   student.className ?? ''
 ).trim()
@@ -217,7 +216,6 @@ return {
     student.className ??
     '',
 }
-```
 
 })
 }
@@ -282,7 +280,6 @@ cache: 'no-store',
 }),
 ])
 
-```
   const studentsJson = studentsRes.ok
     ? await studentsRes.json()
     : []
@@ -424,14 +421,12 @@ cache: 'no-store',
     error
   )
 }
-```
 
 }
 
 useEffect(() => {
 loadData()
 
-```
 try {
   const savedUser = localStorage.getItem(
     'kanyunga-user'
@@ -454,7 +449,6 @@ try {
     error
   )
 }
-```
 
 }, [])
 
@@ -462,7 +456,6 @@ const login = (user: LoginData) => {
 const normalizedRole =
 String(user.role).toLowerCase() as Role
 
-```
 setRole(normalizedRole)
 setLoggedIn(true)
 
@@ -481,7 +474,6 @@ try {
     error
   )
 }
-```
 
 }
 
@@ -489,7 +481,6 @@ const logout = () => {
 setLoggedIn(false)
 setRole('admin')
 
-```
 try {
   localStorage.removeItem(
     'kanyunga-user'
@@ -500,7 +491,6 @@ try {
     error
   )
 }
-```
 
 }
 
@@ -518,7 +508,6 @@ body: JSON.stringify(student),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to create student'
@@ -526,7 +515,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -546,7 +534,6 @@ body: JSON.stringify(student),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to update student'
@@ -554,7 +541,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -568,7 +554,6 @@ method: 'DELETE',
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to delete student'
@@ -576,7 +561,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -594,7 +578,6 @@ body: JSON.stringify(teacher),
 }
 )
 
-```
 if (!response.ok) {
   const error = await response
     .json()
@@ -608,7 +591,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -628,7 +610,6 @@ body: JSON.stringify(teacher),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to update teacher'
@@ -636,7 +617,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -650,7 +630,6 @@ method: 'DELETE',
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to delete teacher'
@@ -658,7 +637,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -676,7 +654,6 @@ body: JSON.stringify(item),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to create class'
@@ -684,7 +661,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -704,7 +680,6 @@ body: JSON.stringify(item),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to update class'
@@ -712,7 +687,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -726,7 +700,6 @@ method: 'DELETE',
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to delete class'
@@ -734,7 +707,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -752,7 +724,6 @@ body: JSON.stringify(item),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to create subject'
@@ -760,7 +731,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -780,7 +750,6 @@ body: JSON.stringify(item),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to update subject'
@@ -788,7 +757,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -802,7 +770,6 @@ method: 'DELETE',
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to delete subject'
@@ -810,7 +777,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -828,7 +794,6 @@ body: JSON.stringify(item),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to create exam'
@@ -836,7 +801,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -856,7 +820,6 @@ body: JSON.stringify(item),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to update exam'
@@ -864,7 +827,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -878,7 +840,6 @@ method: 'DELETE',
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to delete exam'
@@ -886,7 +847,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -904,7 +864,6 @@ body: JSON.stringify(item),
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to create payment'
@@ -912,7 +871,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -945,7 +903,6 @@ status,
 }
 )
 
-```
 if (!response.ok) {
   throw new Error(
     'Failed to save attendance'
@@ -953,7 +910,6 @@ if (!response.ok) {
 }
 
 await loadData()
-```
 
 }
 
@@ -1005,4 +961,3 @@ throw new Error(
 
 return context
   }
-    
