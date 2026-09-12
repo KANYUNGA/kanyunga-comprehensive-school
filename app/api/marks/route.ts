@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db"
+import { getCurrentUser } from "@/lib/server-auth"
 
 const sql = getDb()
 
@@ -7,7 +8,8 @@ function mapMark(mark: any) {
     id: String(mark.id),
     examId: mark.legacy_exam_id ?? String(mark.exam_id),
     studentId: String(mark.student_id),
-    subjectId: mark.legacy_subject_id ?? String(mark.subject_id),
+    subjectId:
+      mark.legacy_subject_id ?? String(mark.subject_id),
     score: Number(mark.marks ?? 0),
   }
 }
@@ -74,75 +76,320 @@ export async function GET() {
         e.legacy_id AS legacy_exam_id,
         s.legacy_id AS legacy_subject_id
       FROM marks m
-      LEFT JOIN exams e ON e.id = m.exam_id
-      LEFT JOIN subjects s ON s.id = m.subject_id
+      LEFT JOIN exams e
+        ON e.id = m.exam_id
+      LEFT JOIN subjects s
+        ON s.id = m.subject_id
       ORDER BY m.id
     `
 
-    return Response.json(marks.map(mapMark))
+    return Response.json(
+      marks.map(mapMark),
+    )
   } catch (error) {
-    console.error("Failed to fetch marks:", error)
+    console.error(
+      "Failed to fetch marks:",
+      error,
+    )
 
     return Response.json(
-      { error: "Failed to fetch marks" },
-      { status: 500 }
+      {
+        error: "Failed to fetch marks",
+      },
+      {
+        status: 500,
+      },
     )
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+) {
   try {
+    const user = await getCurrentUser()
+
+    if (!user) {
+      return Response.json(
+        {
+          error: "You must be logged in to enter marks.",
+        },
+        {
+          status: 401,
+        },
+      )
+    }
+
+    const userRole = String(
+      user.role ?? "",
+    ).toLowerCase()
+
+    const isAdmin =
+      userRole === "admin"
+
+    let teacherSubject: string | null =
+      null
+
+    if (!isAdmin) {
+      if (userRole !== "teacher") {
+        return Response.json(
+          {
+            error:
+              "You are not allowed to enter marks.",
+          },
+          {
+            status: 403,
+          },
+        )
+      }
+
+      if (!user.teacher_id) {
+        return Response.json(
+          {
+            error:
+              "Your account is not linked to a teacher record.",
+          },
+          {
+            status: 403,
+          },
+        )
+      }
+
+      const teacherResult = await sql`
+        SELECT
+          id,
+          subject,
+          status
+        FROM teachers
+        WHERE id = ${Number(user.teacher_id)}
+        LIMIT 1
+      `
+
+      const teacher =
+        teacherResult[0]
+
+      if (!teacher) {
+        return Response.json(
+          {
+            error:
+              "Teacher record not found.",
+          },
+          {
+            status: 403,
+          },
+        )
+      }
+
+      if (
+        String(
+          teacher.status ?? "",
+        ).toLowerCase() !==
+        "active"
+      ) {
+        return Response.json(
+          {
+            error:
+              "Your teacher account is not active.",
+          },
+          {
+            status: 403,
+          },
+        )
+      }
+
+      teacherSubject = String(
+        teacher.subject ?? "",
+      ).trim()
+
+      if (!teacherSubject) {
+        return Response.json(
+          {
+            error:
+              "No subject has been assigned to your teacher account.",
+          },
+          {
+            status: 403,
+          },
+        )
+      }
+    }
+
     const body = await request.json()
 
-    const examId = String(body.examId ?? "")
-    const entries = Array.isArray(body.entries) ? body.entries : []
+    const examId = String(
+      body.examId ?? "",
+    )
+
+    const entries = Array.isArray(
+      body.entries,
+    )
+      ? body.entries
+      : []
 
     if (!examId) {
       return Response.json(
-        { error: "Exam ID is required" },
-        { status: 400 }
+        {
+          error: "Exam ID is required.",
+        },
+        {
+          status: 400,
+        },
       )
     }
 
     if (entries.length === 0) {
       return Response.json(
-        { error: "At least one mark is required" },
-        { status: 400 }
+        {
+          error:
+            "At least one mark is required.",
+        },
+        {
+          status: 400,
+        },
       )
     }
 
-    const databaseExamId = await resolveExamId(examId)
+    const databaseExamId =
+      await resolveExamId(examId)
 
     if (databaseExamId === null) {
       return Response.json(
-        { error: `Exam not found: ${examId}` },
-        { status: 404 }
+        {
+          error:
+            `Exam not found: ${examId}`,
+        },
+        {
+          status: 404,
+        },
       )
     }
 
     for (const entry of entries) {
-      const studentId = String(entry.studentId ?? "")
-      const subjectId = String(entry.subjectId ?? "")
-      const score = Number(entry.score)
+      const studentId = String(
+        entry.studentId ?? "",
+      )
 
-      if (!studentId || !subjectId || !Number.isFinite(score)) {
+      const subjectId = String(
+        entry.subjectId ?? "",
+      )
+
+      const score = Number(
+        entry.score,
+      )
+
+      if (
+        !studentId ||
+        !subjectId ||
+        !Number.isFinite(score)
+      ) {
         continue
       }
 
-      const databaseStudentId = await resolveStudentId(studentId)
-      const databaseSubjectId = await resolveSubjectId(subjectId)
+      const databaseStudentId =
+        await resolveStudentId(
+          studentId,
+        )
 
-      if (databaseStudentId === null) {
-        console.warn(`Student not found: ${studentId}`)
+      const databaseSubjectId =
+        await resolveSubjectId(
+          subjectId,
+        )
+
+      if (
+        databaseStudentId === null
+      ) {
+        console.warn(
+          `Student not found: ${studentId}`,
+        )
         continue
       }
 
-      if (databaseSubjectId === null) {
-        console.warn(`Subject not found: ${subjectId}`)
+      if (
+        databaseSubjectId === null
+      ) {
+        console.warn(
+          `Subject not found: ${subjectId}`,
+        )
         continue
       }
 
-      const safeScore = Math.max(0, Math.min(100, score))
+      /*
+       * Teachers may only save marks
+       * for their assigned subject.
+       *
+       * Admins bypass this restriction.
+       */
+      if (!isAdmin) {
+        const subjectResult =
+          await sql`
+            SELECT
+              id,
+              name,
+              legacy_id
+            FROM subjects
+            WHERE id = ${databaseSubjectId}
+            LIMIT 1
+          `
+
+        const subject =
+          subjectResult[0]
+
+        if (!subject) {
+          return Response.json(
+            {
+              error:
+                "Subject not found.",
+            },
+            {
+              status: 404,
+            },
+          )
+        }
+
+        const assignedSubject =
+          String(
+            teacherSubject ?? "",
+          )
+            .trim()
+            .toLowerCase()
+
+        const databaseSubjectName =
+          String(
+            subject.name ?? "",
+          )
+            .trim()
+            .toLowerCase()
+
+        const databaseLegacyId =
+          String(
+            subject.legacy_id ?? "",
+          )
+            .trim()
+            .toLowerCase()
+
+        const allowed =
+          assignedSubject ===
+            databaseSubjectName ||
+          assignedSubject ===
+            databaseLegacyId
+
+        if (!allowed) {
+          return Response.json(
+            {
+              error:
+                "You can only enter marks for your assigned subject.",
+            },
+            {
+              status: 403,
+            },
+          )
+        }
+      }
+
+      const safeScore = Math.max(
+        0,
+        Math.min(100, score),
+      )
 
       const existing = await sql`
         SELECT id
@@ -178,15 +425,30 @@ export async function POST(request: Request) {
     }
 
     return Response.json(
-      { success: true },
-      { status: 200 }
+      {
+        success: true,
+        message: isAdmin
+          ? "Marks saved successfully."
+          : `Marks saved for ${teacherSubject}.`,
+      },
+      {
+        status: 200,
+      },
     )
   } catch (error) {
-    console.error("Failed to save marks:", error)
+    console.error(
+      "Failed to save marks:",
+      error,
+    )
 
     return Response.json(
-      { error: "Failed to save marks" },
-      { status: 500 }
+      {
+        error:
+          "Failed to save marks.",
+      },
+      {
+        status: 500,
+      },
     )
   }
-}
+      }
