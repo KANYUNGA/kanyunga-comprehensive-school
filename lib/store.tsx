@@ -462,15 +462,19 @@ export function SchoolProvider({
       )
 
       if (savedUser) {
-        const user = JSON.parse(savedUser)
+  const user = JSON.parse(savedUser)
+  const savedRole = String(user?.role ?? '').toLowerCase()
 
-        if (user?.role) {
-          setRole(
-            String(user.role).toLowerCase() as Role
-          )
-
-          setLoggedIn(true)
-        }
+  if (
+    savedRole === 'admin' ||
+    savedRole === 'teacher' ||
+    savedRole === 'parent'
+  ) {
+    setRole(savedRole as Role)
+    setLoggedIn(true)
+  } else {
+    localStorage.removeItem('kanyunga-user')
+  }
       }
     } catch (error) {
       console.error(
