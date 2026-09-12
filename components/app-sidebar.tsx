@@ -1,3 +1,4 @@
+
 'use client'
 
 import Image from 'next/image'
@@ -159,7 +160,7 @@ const NAV: NavGroup[] = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { data, logout, auth } = useSchool()
+  const { data, logout, role } = useSchool()
 
   function isActive(href: string) {
     if (href === '/dashboard') {
@@ -170,13 +171,23 @@ export function AppSidebar() {
   }
 
   const visibleGroups =
-    auth?.role === 'admin'
+    role === 'admin'
       ? NAV
       : NAV.filter(
           (group) =>
             group.label !== 'System' &&
             group.label !== 'Finance'
         )
+
+  const displayName =
+    role === 'admin'
+      ? 'System Administrator'
+      : 'User'
+
+  const displayRole =
+    role === 'admin'
+      ? 'Admin'
+      : role
 
   return (
     <Sidebar>
@@ -242,11 +253,11 @@ export function AppSidebar() {
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-sidebar-foreground">
-                  {auth?.name || 'User'}
+                  {displayName}
                 </p>
 
                 <p className="truncate text-xs text-sidebar-foreground/60">
-                  {auth?.role || 'user'}
+                  {displayRole}
                 </p>
               </div>
             </div>
@@ -263,7 +274,7 @@ export function AppSidebar() {
               <span>Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
-        </SidebarMenu>
+        </Sidebar>
       </SidebarFooter>
     </Sidebar>
   )
