@@ -25,26 +25,12 @@ function mapStudent(s: any) {
       ? new Date(s.admission_date).toISOString().slice(0, 10)
       : "",
     status: s.status ?? "Active",
-    photoUrl: s.photo_url ?? "",
   }
 }
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET() {
   try {
-    const { id } = await params
-    const studentId = Number(id)
-
-    if (!Number.isInteger(studentId) || studentId <= 0) {
-      return Response.json(
-        { error: "Invalid student ID" },
-        { status: 400 }
-      )
-    }
-
-    const result = await sql`
+    const students = await sql`
       SELECT
         id,
         admission_number,
@@ -59,35 +45,29 @@ export async function GET(
         parent_phone,
         address,
         admission_date,
-        status,
-        photo_url
+        status
       FROM students
-      WHERE id = ${studentId}
-      LIMIT 1
+      ORDER BY id ASC
     `
 
-    if (result.length === 0) {
-      return Response.json(
-        { error: "Student not found" },
-        { status: 404 }
-      )
-    }
-
-    return Response.json(mapStudent(result[0]))
+    return Response.json(students.map(mapStudent))
   } catch (error) {
-    console.error("Failed to fetch student:", error)
+    console.error("Failed to fetch students:", error)
 
     return Response.json(
-      { error: "Failed to fetch student" },
+      {
+        error: "Failed to fetch students",
+        detail:
+          error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
       { status: 500 }
     )
   }
 }
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: Request) {
   const auth = await requireAdmin()
 
   if (!auth.authorized) {
@@ -95,48 +75,60 @@ export async function PUT(
   }
 
   try {
-    const { id } = await params
-    const studentId = Number(id)
+    const student = await request.json()
 
-    if (!Number.isInteger(studentId) || studentId <= 0) {
+    if (!student.admissionNo || !student.firstName) {
       return Response.json(
-        { error: "Invalid student ID" },
+        {
+          error: "Admission number and first name are required",
+        },
         { status: 400 }
       )
     }
 
-    const student = await request.json()
-
-    const className =
-      student.className?.toString().trim() ||
-      student.classId?.toString().trim() ||
-      ""
-
-    if (!className) {
+    if (!student.className && !student.classId) {
       return Response.json(
         { error: "Class is required" },
         { status: 400 }
       )
     }
 
+    const className =
+      student.className?.toString().trim() ||
+      student.classId?.toString().trim() ||
+      ""
+
     const result = await sql`
-      UPDATE students
-      SET
-        admission_number = ${student.admissionNo},
-        first_name = ${student.firstName},
-        middle_name = ${student.middleName || null},
-        last_name = ${student.lastName},
-        gender = ${student.gender},
-        date_of_birth = ${student.dateOfBirth || null},
-        class_name = ${className},
-        stream = ${student.stream || ""},
-        parent_name = ${student.guardianName || ""},
-        parent_phone = ${student.guardianPhone || ""},
-        address = ${student.address || null},
-        admission_date = ${student.admissionDate || null},
-        status = ${student.status || "Active"},
-        photo_url = ${student.photoUrl || null}
-      WHERE id = ${studentId}
+      INSERT INTO students (
+        admission_number,
+        first_name,
+        middle_name,
+        last_name,
+        gender,
+        date_of_birth,
+        class_name,
+        stream,
+        parent_name,
+        parent_phone,
+        address,
+        admission_date,
+        status
+      )
+      VALUES (
+        ${student.admissionNo},
+        ${student.firstName},
+        ${student.middleName || null},
+        ${student.lastName || null},
+        ${student.gender || "Male"},
+        ${student.dateOfBirth || null},
+        ${className},
+        ${student.stream || ""},
+        ${student.guardianName || ""},
+        ${student.guardianPhone || ""},
+        ${student.address || null},
+        ${student.admissionDate || null},
+        ${student.status || "Active"}
+      )
       RETURNING
         id,
         admission_number,
@@ -151,24 +143,16 @@ export async function PUT(
         parent_phone,
         address,
         admission_date,
-        status,
-        photo_url
+        status
     `
 
-    if (result.length === 0) {
-      return Response.json(
-        { error: "Student not found" },
-        { status: 404 }
-      )
-    }
-
-    return Response.json(mapStudent(result[0]))
+    return Response.json(mapStudent(result[0]), { status: 201 })
   } catch (error) {
-    console.error("Failed to update student:", error)
+    console.error("Failed to create student:", error)
 
     return Response.json(
       {
-        error: "Failed to update student",
+        error: "Failed to create student",
         detail:
           error instanceof Error
             ? error.message
@@ -177,52 +161,4 @@ export async function PUT(
       { status: 500 }
     )
   }
-}
-
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const auth = await requireAdmin()
-
-  if (!auth.authorized) {
-    return auth.response
-  }
-
-  try {
-    const { id } = await params
-    const studentId = Number(id)
-
-    if (!Number.isInteger(studentId) || studentId <= 0) {
-      return Response.json(
-        { error: "Invalid student ID" },
-        { status: 400 }
-      )
-    }
-
-    const result = await sql`
-      DELETE FROM students
-      WHERE id = ${studentId}
-      RETURNING id
-    `
-
-    if (result.length === 0) {
-      return Response.json(
-        { error: "Student not found" },
-        { status: 404 }
-      )
-    }
-
-    return Response.json({
-      success: true,
-      id: String(studentId),
-    })
-  } catch (error) {
-    console.error("Failed to delete student:", error)
-
-    return Response.json(
-      { error: "Failed to delete student" },
-      { status: 500 }
-    )
-  }
-}
+          }
