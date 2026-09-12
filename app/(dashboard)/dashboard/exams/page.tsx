@@ -1,947 +1,928 @@
+
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSchool } from '@/lib/store'
 import { studentName } from '@/lib/data'
-import { getGrade, gradeColor, meanGradeFromPoints } from '@/lib/grading'
+import { getGrade, meanGradeFromPoints } from '@/lib/grading'
 import { PageHeader } from '@/components/page-header'
-import {
-Card,
-CardContent,
-CardHeader,
-CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
 import {
-Table,
-TableBody,
-TableCell,
-TableHead,
-TableHeader,
-TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table'
 import {
-Dialog,
-DialogContent,
-DialogFooter,
-DialogHeader,
-DialogTitle,
-DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
-import { ClipboardList, Download, Plus, Trophy } from 'lucide-react'
+import {
+  ClipboardList,
+  Download,
+  Plus,
+  Trophy,
+} from 'lucide-react'
 
 const CLASS_ORDER = [
-'Playgroup',
-'PP1',
-'PP2',
-'Grade 1',
-'Grade 2',
-'Grade 3',
-'Grade 4',
-'Grade 5',
-'Grade 6',
-'Grade 7',
-'Grade 8',
-'Grade 9',
+  'playgroup',
+  'pp1',
+  'pp2',
+  'grade 1',
+  'grade 2',
+  'grade 3',
+  'grade 4',
+  'grade 5',
+  'grade 6',
+  'grade 7',
+  'grade 8',
+  'grade 9',
 ]
 
-const REPORT_SUBJECT_NAMES = [
-'English',
-'Kiswahili',
-'Mathematics',
-'Integrated Science',
-'Pre-Technical Studies',
-'Social Studies',
-'Religious Education',
-'Agriculture',
-'Creative Arts',
-]
-
-function normalizeClassName(value: unknown) {
-const name = String(value ?? '')
-.trim()
-.toLowerCase()
-.replace(/\s+/g, ' ')
-
-if (
-name === 'play group' ||
-name === 'playgroup' ||
-name === 'play-group'
-) {
-return 'playgroup'
+function normalizeClassName(value: string) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^play group$/, 'playgroup')
+    .replace(/^pre ?primary 1$/, 'pp1')
+    .replace(/^pre-primary 1$/, 'pp1')
+    .replace(/^pre ?primary 2$/, 'pp2')
+    .replace(/^pre-primary 2$/, 'pp2')
 }
 
-if (
-name === 'preprimary 1' ||
-name === 'pre-primary 1' ||
-name === 'pre primary 1' ||
-name === 'pp1'
-) {
-return 'pp1'
-}
+function classDisplayName(name: string) {
+  const normalized = normalizeClassName(name)
 
-if (
-name === 'preprimary 2' ||
-name === 'pre-primary 2' ||
-name === 'pre primary 2' ||
-name === 'pp2'
-) {
-return 'pp2'
-}
+  if (normalized === 'playgroup') return 'Playgroup'
+  if (normalized === 'pp1') return 'PP1'
+  if (normalized === 'pp2') return 'PP2'
 
-return name
-}
-
-function classSortNumber(name: string) {
-const normalized = normalizeClassName(name)
-
-if (normalized === 'playgroup') return 0
-if (normalized === 'pp1') return 1
-if (normalized === 'pp2') return 2
-
-const match = normalized.match(/^grade\s+(\d+)$/)
-
-if (match) {
-return 2 + Number(match[1])
-}
-
-return 100
-}
-
-function displayClassName(name: string) {
-const normalized = normalizeClassName(name)
-
-if (normalized === 'playgroup') return 'Playgroup'
-if (normalized === 'pp1') return 'PP1'
-if (normalized === 'pp2') return 'PP2'
-
-const match = normalized.match(/^grade\s+(\d+)$/)
-
-if (match) {
-return `Grade ${match[1]}`
-}
-
-return name
-}
-
-function subjectMatchesReportName(subjectName: string) {
-const normalized = subjectName
-.trim()
-.toLowerCase()
-
-return REPORT_SUBJECT_NAMES.some(
-(name) => name.toLowerCase() === normalized,
-)
+  return name
 }
 
 export default function ExamsPage() {
-const { data, addExam, saveMarks, role } = useSchool()
+  const { data, addExam, saveMarks, role } = useSchool()
 
-const [selectedExam, setSelectedExam] = useState(
-data.exams[1]?.id ??
-data.exams[0]?.id ??
-'',
-)
-
-const [entryClass, setEntryClass] = useState(
-data.classes[0]?.id ?? '',
-)
-
-const [entrySubject, setEntrySubject] = useState(
-data.subjects.find((subject) =>
-String(subject.name ?? '')
-.toLowerCase()
-.includes('mathematics'),
-)?.id ??
-data.subjects[0]?.id ??
-'',
-)
-
-const [draft, setDraft] = useState<
-Record<string, string>
-
-> ({})
-
-const [open, setOpen] = useState(false)
-const [name, setName] = useState('')
-const [term, setTerm] = useState(
-data.school.currentTerm,
-)
-
-const sortedClasses = useMemo(() => {
-return [...data.classes].sort((a, b) => {
-const orderA = classSortNumber(a.name)
-const orderB = classSortNumber(b.name)
-
-
-  if (orderA !== orderB) {
-    return orderA - orderB
-  }
-
-  return String(a.name).localeCompare(
-    String(b.name),
+  const [selectedExam, setSelectedExam] = useState(
+    data.exams[0]?.id ?? '',
   )
-})
 
-}, [data.classes])
-
-useEffect(() => {
-if (sortedClasses.length === 0) {
-setEntryClass('')
-return
-}
-
-
-const classExists = sortedClasses.some(
-  (item) => String(item.id) === String(entryClass),
-)
-
-if (!classExists) {
-  setEntryClass(sortedClasses[0].id)
-  setDraft({})
-}
-
-}, [sortedClasses, entryClass])
-
-useEffect(() => {
-if (data.exams.length === 0) {
-setSelectedExam('')
-return
-}
-
-
-const examExists = data.exams.some(
-  (exam) =>
-    String(exam.id) === String(selectedExam),
-)
-
-if (!examExists) {
-  setSelectedExam(
-    data.exams[1]?.id ??
-      data.exams[0]?.id ??
-      '',
+  const [entryClass, setEntryClass] = useState(
+    data.classes[0]?.id ?? '',
   )
-}
 
-}, [data.exams, selectedExam])
+  const [entrySubject, setEntrySubject] = useState(
+    data.subjects[0]?.id ?? '',
+  )
 
-const subjectsUsed = useMemo(() => {
-const reportSubjects = data.subjects.filter(
-(subject) =>
-subjectMatchesReportName(
-String(subject.name ?? ''),
-),
-)
+  const [draft, setDraft] = useState<Record<string, string>>({})
 
-if (reportSubjects.length > 0) {
-  return reportSubjects
-}
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [term, setTerm] = useState(
+    data.school.currentTerm,
+  )
 
-return data.subjects
-}, [data.subjects])
+  const sortedClasses = useMemo(() => {
+    return [...data.classes].sort((a, b) => {
+      const aIndex = CLASS_ORDER.indexOf(
+        normalizeClassName(a.name),
+      )
 
-useEffect(() => {
-if (subjectsUsed.length === 0) {
-setEntrySubject('')
-return
-}
+      const bIndex = CLASS_ORDER.indexOf(
+        normalizeClassName(b.name),
+      )
 
-const exists = subjectsUsed.some(
-  (subject) =>
-    String(subject.id) ===
-    String(entrySubject),
-)
+      const safeA = aIndex === -1 ? 999 : aIndex
+      const safeB = bIndex === -1 ? 999 : bIndex
 
-if (!exists) {
-  setEntrySubject(subjectsUsed[0].id)
-  setDraft({})
-}
+      return safeA - safeB
+    })
+  }, [data.classes])
 
-}, [subjectsUsed, entrySubject])
-
-const selectedClass = useMemo(
-() =>
-data.classes.find(
-(item) =>
-String(item.id) ===
-String(entryClass),
-),
-[data.classes, entryClass],
-)
-
-const roster = useMemo(() => {
-if (!selectedClass) {
-return []
-}
-
-
-const selectedClassName = normalizeClassName(
-  selectedClass.name,
-)
-
-return data.students
-  .filter((student) => {
-    if (
-      String(student.status ?? '')
-        .toLowerCase() !== 'active'
-    ) {
-      return false
+  useEffect(() => {
+    if (!selectedExam && data.exams.length > 0) {
+      setSelectedExam(data.exams[0].id)
     }
+  }, [data.exams, selectedExam])
 
-    const classFromName =
-      normalizeClassName(student.className)
+  useEffect(() => {
+    if (sortedClasses.length === 0) return
 
-    const classFromId =
-      normalizeClassName(student.classId)
-
-    return (
-      classFromName === selectedClassName ||
-      classFromId === selectedClassName
+    const exists = sortedClasses.some(
+      (classItem) => classItem.id === entryClass,
     )
-  })
-  .sort((a, b) =>
-    studentName(a).localeCompare(
-      studentName(b),
-    ),
-  )
 
-}, [data.students, selectedClass])
-
-function existingScore(studentId: string) {
-return data.marks.find(
-(mark) =>
-String(mark.examId) ===
-String(selectedExam) &&
-String(mark.studentId) ===
-String(studentId) &&
-String(mark.subjectId) ===
-String(entrySubject),
-)?.score
-}
-
-function handleSaveMarks() {
-if (!selectedExam || !entrySubject) {
-return
-}
-
-
-const entries = roster
-  .map((student) => {
-    const raw = draft[student.id]
-
-    const val =
-      raw !== undefined
-        ? Number(raw)
-        : existingScore(student.id)
-
-    if (
-      val === undefined ||
-      Number.isNaN(val)
-    ) {
-      return null
+    if (!exists) {
+      setEntryClass(sortedClasses[0].id)
+      setDraft({})
     }
+  }, [sortedClasses, entryClass])
 
-    return {
-      studentId: student.id,
-      subjectId: entrySubject,
-      score: Math.max(
-        0,
-        Math.min(100, val),
+  const selectedClass = useMemo(() => {
+    return sortedClasses.find(
+      (classItem) => classItem.id === entryClass,
+    )
+  }, [sortedClasses, entryClass])
+
+  const subjectsUsed = useMemo(() => {
+    const reportSubjectNames = [
+      'English',
+      'Kiswahili',
+      'Mathematics',
+      'Integrated Science',
+      'Pre-Technical Studies',
+      'Social Studies',
+      'Religious Education',
+      'Agriculture',
+      'Creative Arts',
+    ]
+
+    const matched = data.subjects.filter((subject) =>
+      reportSubjectNames.some(
+        (subjectNameValue) =>
+          subject.name?.toLowerCase() ===
+          subjectNameValue.toLowerCase(),
       ),
+    )
+
+    return matched.length > 0 ? matched : data.subjects
+  }, [data.subjects])
+
+  useEffect(() => {
+    if (subjectsUsed.length === 0) return
+
+    const exists = subjectsUsed.some(
+      (subject) => subject.id === entrySubject,
+    )
+
+    if (!exists) {
+      setEntrySubject(subjectsUsed[0].id)
+      setDraft({})
     }
-  })
-  .filter(
-    (
-      entry,
-    ): entry is {
-      studentId: string
-      subjectId: string
-      score: number
-    } => entry !== null,
-  )
+  }, [subjectsUsed, entrySubject])
 
-if (entries.length === 0) {
-  return
-}
+  const roster = useMemo(() => {
+    if (!selectedClass) return []
 
-saveMarks(selectedExam, entries)
-setDraft({})
-
-
-}
-
-function handleCreateExam() {
-if (!name.trim()) {
-return
-}
-
-
-addExam({
-  name: name.trim(),
-  term,
-  year: data.school.currentYear,
-  outOf: 100,
-})
-
-setName('')
-setOpen(false)
-
-}
-
-function csvEscape(value: unknown) {
-const text = String(value ?? '')
-return `"${text.replace(/"/g, '""')}"`
-}
-
-function downloadMarkSheet() {
-if (!selectedClass || roster.length === 0) {
-return
-}
-
-const selectedSubjectList =
-  subjectsUsed.length > 0
-    ? subjectsUsed
-    : data.subjects
-
-const headers = [
-  'No.',
-  'Admission Number',
-  'Learner Name',
-  'Stream',
-  ...selectedSubjectList.map(
-    (subject) => subject.name,
-  ),
-  'Total',
-  'Average',
-]
-
-const rows = roster.map(
-  (student, index) => [
-    index + 1,
-    student.admissionNo,
-    studentName(student),
-    student.stream ?? '',
-    ...selectedSubjectList.map(
-      () => '',
-    ),
-    '',
-    '',
-  ],
-)
-
-const csv = [
-  [
-    'KANYUNGA COMPREHENSIVE SCHOOL',
-  ].map(csvEscape).join(','),
-  [
-    'EXAMINATION MARK SHEET',
-  ].map(csvEscape).join(','),
-  [
-    'Examination',
-    data.exams.find(
-      (exam) =>
-        String(exam.id) ===
-        String(selectedExam),
-    )?.name ?? '',
-  ]
-    .map(csvEscape)
-    .join(','),
-  [
-    'Class',
-    displayClassName(
+    const selectedClassName = normalizeClassName(
       selectedClass.name,
-    ),
-  ]
-    .map(csvEscape)
-    .join(','),
-  [
-    'Term',
-    data.exams.find(
-      (exam) =>
-        String(exam.id) ===
-        String(selectedExam),
-    )?.term ?? '',
-  ]
-    .map(csvEscape)
-    .join(','),
-  [
-    'Year',
-    data.exams.find(
-      (exam) =>
-        String(exam.id) ===
-        String(selectedExam),
-    )?.year ?? data.school.currentYear,
-  ]
-    .map(csvEscape)
-    .join(','),
-  '',
-  headers.map(csvEscape).join(','),
-  ...rows.map((row) =>
-    row.map(csvEscape).join(','),
-  ),
-].join('\n')
+    )
 
-const blob = new Blob([csv], {
-  type: 'text/csv;charset=utf-8;',
-})
+    return data.students
+      .filter((student) => {
+        if (student.status !== 'Active') return false
 
-const url = URL.createObjectURL(blob)
+        const studentClassName = normalizeClassName(
+          String(student.className || ''),
+        )
 
-const link = document.createElement('a')
-link.href = url
+        const studentClassId = normalizeClassName(
+          String(student.classId || ''),
+        )
 
-const safeClass = displayClassName(
-  selectedClass.name,
-)
-  .replace(/\s+/g, '-')
-  .toLowerCase()
+        return (
+          studentClassName === selectedClassName ||
+          studentClassId === selectedClassName
+        )
+      })
+      .sort((a, b) =>
+        String(a.admissionNo || '').localeCompare(
+          String(b.admissionNo || ''),
+        ),
+      )
+  }, [data.students, selectedClass])
 
-const examName =
-  data.exams.find(
-    (exam) =>
-      String(exam.id) ===
-      String(selectedExam),
-  )?.name ?? 'Exam'
-
-const safeExam = examName
-  .replace(/[^a-z0-9]+/gi, '-')
-  .replace(/^-+|-+$/g, '')
-  .toLowerCase()
-
-link.download = `${safeClass}-${safeExam}-mark-sheet.csv`
-
-document.body.appendChild(link)
-link.click()
-document.body.removeChild(link)
-
-URL.revokeObjectURL(url)
-
-}
-
-const ranking = useMemo(() => {
-const rows = roster.map((student) => {
-const studentMarks =
-data.marks.filter(
-(mark) =>
-String(mark.examId) ===
-String(selectedExam) &&
-String(mark.studentId) ===
-String(student.id),
-)
-
-
-  const total = studentMarks.reduce(
-    (sum, mark) =>
-      sum + Number(mark.score),
-    0,
-  )
-
-  const count = studentMarks.length
-
-  const avg = count
-    ? total / count
-    : 0
-
-  const points = count
-    ? studentMarks.reduce(
-        (sum, mark) =>
-          sum +
-          getGrade(
-            Number(mark.score),
-          ).points,
-        0,
-      ) / count
-    : 0
-
-  return {
-    student,
-    total,
-    count,
-    avg,
-    meanGrade:
-      meanGradeFromPoints(points),
+  function existingScore(studentId: string) {
+    return data.marks.find(
+      (mark) =>
+        mark.examId === selectedExam &&
+        mark.studentId === studentId &&
+        mark.subjectId === entrySubject,
+    )?.score
   }
-})
 
-return rows
-  .filter((row) => row.count > 0)
-  .sort((a, b) => b.avg - a.avg)
-  .map((row, index) => ({
-    ...row,
-    position: index + 1,
-  }))
+  function handleSaveMarks() {
+    if (!selectedExam || !entrySubject) return
 
-}, [
-roster,
-data.marks,
-selectedExam,
-])
+    const entries = roster
+      .map((student) => {
+        const raw = draft[student.id]
 
-return ( <div className="flex flex-col gap-6">
-<PageHeader
-title="Examination Management"
-description="Create examinations, enter marks, download class mark sheets and view results."
-actions={
-role === 'admin' ? ( <Dialog
-           open={open}
-           onOpenChange={setOpen}
-         >
-<DialogTrigger
-render={<Button />}
-> <Plus className="size-4" />
-New Exam </DialogTrigger>
+        const value =
+          raw !== undefined
+            ? Number(raw)
+            : existingScore(student.id)
 
-  <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Create Examination
-              </DialogTitle>
-            </DialogHeader>
+        if (value === undefined || Number.isNaN(value)) {
+          return null
+        }
 
-            <div className="flex flex-col gap-4 py-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="exm-name">
-                  Exam name
-                </Label>
+        return {
+          studentId: student.id,
+          subjectId: entrySubject,
+          score: Math.max(
+            0,
+            Math.min(100, value),
+          ),
+        }
+      })
+      .filter(
+        (
+          entry,
+        ): entry is {
+          studentId: string
+          subjectId: string
+          score: number
+        } => entry !== null,
+      )
 
-                <Input
-                  id="exm-name"
-                  placeholder="e.g. End of Term 2"
-                  value={name}
-                  onChange={(event) =>
-                    setName(
-                      event.target.value,
-                    )
-                  }
-                />
+    if (entries.length === 0) return
+
+    saveMarks(selectedExam, entries)
+    setDraft({})
+  }
+
+  function handleCreateExam() {
+    if (!name.trim()) return
+
+    addExam({
+      name: name.trim(),
+      term,
+      year: data.school.currentYear,
+      outOf: 100,
+    })
+
+    setName('')
+    setOpen(false)
+  }
+
+  function csvValue(value: string | number | undefined) {
+    const text = String(value ?? '')
+
+    return `"${text.replace(/"/g, '""')}"`
+  }
+
+  function downloadMarkSheet() {
+    if (!selectedClass) return
+
+    const headers = [
+      'No.',
+      'Admission Number',
+      'Learner Name',
+      'Stream',
+      ...subjectsUsed.map(
+        (subject) => subject.name,
+      ),
+      'Total',
+      'Average',
+    ]
+
+    const rows = roster.map((student, index) => {
+      let total = 0
+      let count = 0
+
+      const scores = subjectsUsed.map((subject) => {
+        const mark = data.marks.find(
+          (item) =>
+            item.examId === selectedExam &&
+            item.studentId === student.id &&
+            item.subjectId === subject.id,
+        )
+
+        if (mark?.score !== undefined) {
+          total += Number(mark.score)
+          count += 1
+          return mark.score
+        }
+
+        return ''
+      })
+
+      const average =
+        count > 0
+          ? (total / count).toFixed(2)
+          : ''
+
+      return [
+        index + 1,
+        student.admissionNo,
+        studentName(student),
+        student.stream || '',
+        ...scores,
+        total || '',
+        average,
+      ]
+    })
+
+    const csv = [
+      headers.map(csvValue).join(','),
+      ...rows.map((row) =>
+        row.map(csvValue).join(','),
+      ),
+    ].join('\n')
+
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8;',
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+
+    const fileClassName = classDisplayName(
+      selectedClass.name,
+    ).replace(/\s+/g, '-')
+
+    link.download = `${fileClassName}-mark-sheet.csv`
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    URL.revokeObjectURL(url)
+  }
+
+  const ranking = useMemo(() => {
+    const rows = roster.map((student) => {
+      const studentMarks = data.marks.filter(
+        (mark) =>
+          mark.examId === selectedExam &&
+          mark.studentId === student.id,
+      )
+
+      const total = studentMarks.reduce(
+        (sum, mark) =>
+          sum + Number(mark.score),
+        0,
+      )
+
+      const count = studentMarks.length
+
+      const average =
+        count > 0 ? total / count : 0
+
+      const points =
+        count > 0
+          ? studentMarks.reduce(
+              (sum, mark) =>
+                sum +
+                getGrade(mark.score).points,
+              0,
+            ) / count
+          : 0
+
+      return {
+        student,
+        total,
+        count,
+        average,
+        meanGrade:
+          meanGradeFromPoints(points),
+      }
+    })
+
+    return rows
+      .filter((row) => row.count > 0)
+      .sort(
+        (a, b) => b.average - a.average,
+      )
+      .map((row, index) => ({
+        ...row,
+        position: index + 1,
+      }))
+  }, [
+    roster,
+    data.marks,
+    selectedExam,
+  ])
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Examinations"
+        description="Create examinations, enter learner marks and download mark sheets."
+        icon={ClipboardList}
+      >
+        {role === 'admin' && (
+          <Dialog
+            open={open}
+            onOpenChange={setOpen}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Exam
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  Create Examination
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>
+                    Examination Name
+                  </Label>
+
+                  <Input
+                    value={name}
+                    onChange={(event) =>
+                      setName(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="e.g. Term 2 Assessment"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Term</Label>
+
+                  <select
+                    value={term}
+                    onChange={(event) =>
+                      setTerm(
+                        event.target.value,
+                      )
+                    }
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="Term 1">
+                      Term 1
+                    </option>
+
+                    <option value="Term 2">
+                      Term 2
+                    </option>
+
+                    <option value="Term 3">
+                      Term 3
+                    </option>
+                  </select>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="exm-term">
-                  Term
-                </Label>
-
-                <select
-                  id="exm-term"
-                  value={term}
-                  onChange={(event) =>
-                    setTerm(
-                      event.target.value,
-                    )
-                  }
-                  className="h-10 rounded-md border bg-background px-3 text-sm"
+              <DialogFooter>
+                <Button
+                  onClick={handleCreateExam}
                 >
-                  <option value="Term 1">
-                    Term 1
+                  Create Examination
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </PageHeader>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Mark Entry
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="space-y-2">
+              <Label>
+                Examination
+              </Label>
+
+              <select
+                value={selectedExam}
+                onChange={(event) => {
+                  setSelectedExam(
+                    event.target.value,
+                  )
+                  setDraft({})
+                }}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              >
+                {data.exams.length === 0 ? (
+                  <option value="">
+                    No examinations
                   </option>
-                  <option value="Term 2">
-                    Term 2
-                  </option>
-                  <option value="Term 3">
-                    Term 3
-                  </option>
-                </select>
-              </div>
+                ) : (
+                  data.exams.map((exam) => (
+                    <option
+                      key={exam.id}
+                      value={exam.id}
+                    >
+                      {exam.name}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
 
-            <DialogFooter>
+            <div className="space-y-2">
+              <Label>
+                Class
+              </Label>
+
+              <select
+                value={entryClass}
+                onChange={(event) => {
+                  setEntryClass(
+                    event.target.value,
+                  )
+                  setDraft({})
+                }}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              >
+                {sortedClasses.map(
+                  (classItem) => (
+                    <option
+                      key={classItem.id}
+                      value={classItem.id}
+                    >
+                      {classDisplayName(
+                        classItem.name,
+                      )}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                Subject
+              </Label>
+
+              <select
+                value={entrySubject}
+                onChange={(event) => {
+                  setEntrySubject(
+                    event.target.value,
+                  )
+                  setDraft({})
+                }}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              >
+                {subjectsUsed.map(
+                  (subject) => (
+                    <option
+                      key={subject.id}
+                      value={subject.id}
+                    >
+                      {subject.name}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+
+            <div className="flex items-end">
               <Button
+                onClick={
+                  downloadMarkSheet
+                }
                 variant="outline"
-                onClick={() =>
-                  setOpen(false)
+                className="w-full"
+                disabled={
+                  !selectedClass ||
+                  roster.length === 0
                 }
               >
-                Cancel
+                <Download className="mr-2 h-4 w-4" />
+                Download Mark Sheet
               </Button>
-
-              <Button
-                onClick={handleCreateExam}
-              >
-                Create
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null
-    }
-  />
-
-  {data.exams.length > 0 && (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {data.exams.map((exam) => (
-        <button
-          key={exam.id}
-          type="button"
-          onClick={() =>
-            setSelectedExam(exam.id)
-          }
-          className={cn(
-            'flex items-center gap-3 rounded-lg border p-4 text-left transition-colors',
-            selectedExam === exam.id
-              ? 'border-primary bg-primary/5'
-              : 'bg-card hover:bg-muted',
-          )}
-        >
-          <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <ClipboardList className="size-5" />
-          </span>
-
-          <div>
-            <p className="font-medium">
-              {exam.name}
-            </p>
-
-            <p className="text-sm text-muted-foreground">
-              {exam.term} · {exam.year}
-            </p>
+            </div>
           </div>
-        </button>
-      ))}
-    </div>
-  )}
 
-  {data.exams.length === 0 && (
-    <Card>
-      <CardContent className="p-8 text-center text-muted-foreground">
-        No examinations have been created yet.
-      </CardContent>
-    </Card>
-  )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant="secondary">
+              {classDisplayName(
+                selectedClass?.name || '',
+              )}
+            </Badge>
 
-  <div className="flex flex-col gap-4">
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          Examination Selection
-        </CardTitle>
-      </CardHeader>
+            <Badge variant="outline">
+              {roster.length} learners
+            </Badge>
 
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-2">
+            {selectedExam && (
+              <Badge variant="outline">
+                {data.exams.find(
+                  (exam) =>
+                    exam.id ===
+                    selectedExam,
+                )?.name ||
+                  'Examination'}
+              </Badge>
+            )}
+          </div>
+
+          {roster.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <p className="font-medium">
+                No learners found
+              </p>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                There are no active learners
+                registered in{' '}
+                {classDisplayName(
+                  selectedClass?.name ||
+                    'this class',
+                )}
+                .
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        No.
+                      </TableHead>
+
+                      <TableHead>
+                        Admission No.
+                      </TableHead>
+
+                      <TableHead>
+                        Learner
+                      </TableHead>
+
+                      <TableHead>
+                        Stream
+                      </TableHead>
+
+                      <TableHead>
+                        Score / 100
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {roster.map(
+                      (
+                        student,
+                        index,
+                      ) => {
+                        const savedScore =
+                          existingScore(
+                            student.id,
+                          )
+
+                        return (
+                          <TableRow
+                            key={
+                              student.id
+                            }
+                          >
+                            <TableCell>
+                              {index + 1}
+                            </TableCell>
+
+                            <TableCell>
+                              {
+                                student.admissionNo
+                              }
+                            </TableCell>
+
+                            <TableCell className="font-medium">
+                              {studentName(
+                                student,
+                              )}
+                            </TableCell>
+
+                            <TableCell>
+                              {student.stream ||
+                                '-'}
+                            </TableCell>
+
+                            <TableCell className="w-40">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={
+                                  draft[
+                                    student.id
+                                  ] ??
+                                  (savedScore !==
+                                  undefined
+                                    ? String(
+                                        savedScore,
+                                      )
+                                    : '')
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  setDraft(
+                                    (
+                                      current,
+                                    ) => ({
+                                      ...current,
+                                      [student.id]:
+                                        event
+                                          .target
+                                          .value,
+                                    }),
+                                  )
+                                }
+                                placeholder="Enter score"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        )
+                      },
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={
+                    handleSaveMarks
+                  }
+                  disabled={
+                    !selectedExam ||
+                    !entrySubject
+                  }
+                >
+                  Save Marks
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={
+                    downloadMarkSheet
+                  }
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Mark Sheet
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5" />
+            Results & Ranking
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          <div className="mb-4">
             <Label>
               Class
             </Label>
 
             <select
               value={entryClass}
-              onChange={(event) => {
+              onChange={(event) =>
                 setEntryClass(
                   event.target.value,
                 )
-                setDraft({})
-              }}
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              }
+              className="mt-2 w-full max-w-sm rounded-md border bg-background px-3 py-2 text-sm"
             >
-              <option value="">
-                Select class
-              </option>
-
-              {sortedClasses.map((item) => (
-                <option
-                  key={item.id}
-                  value={item.id}
-                >
-                  {displayClassName(
-                    item.name,
-                  )}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label>
-              Subject
-            </Label>
-
-            <select
-              value={entrySubject}
-              onChange={(event) => {
-                setEntrySubject(
-                  event.target.value,
-                )
-                setDraft({})
-              }}
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">
-                Select subject
-              </option>
-
-              {subjectsUsed.map(
-                (subject) => (
+              {sortedClasses.map(
+                (classItem) => (
                   <option
-                    key={subject.id}
-                    value={subject.id}
+                    key={classItem.id}
+                    value={classItem.id}
                   >
-                    {subject.name}
+                    {classDisplayName(
+                      classItem.name,
+                    )}
                   </option>
                 ),
               )}
             </select>
           </div>
-        </div>
-      </CardContent>
-    </Card>
 
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p className="font-semibold">
-          {selectedClass
-            ? displayClassName(
-                selectedClass.name,
-              )
-            : 'No class selected'}
-        </p>
+          {ranking.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <p className="font-medium">
+                No results available
+              </p>
 
-        <p className="text-sm text-muted-foreground">
-          {roster.length}{' '}
-          {roster.length === 1
-            ? 'learner'
-            : 'learners'}
-        </p>
-      </div>
-
-      <Button
-        variant="outline"
-        onClick={downloadMarkSheet}
-        disabled={
-          !selectedClass ||
-          roster.length === 0 ||
-          subjectsUsed.length === 0
-        }
-      >
-        <Download className="mr-2 size-4" />
-        Download Mark Sheet
-      </Button>
-    </div>
-
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          Enter Marks
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="flex flex-col gap-4">
-        {roster.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-10 text-center">
-            <p className="font-medium">
-              No learners found
-            </p>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              There are no active learners
-              registered in this class yet.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="rounded-lg bg-muted/50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium">
-                    {selectedClass
-                      ? displayClassName(
-                          selectedClass.name,
-                        )
-                      : ''}
-                  </p>
-
-                  <p className="text-sm text-muted-foreground">
-                    {roster.length} learners
-                    ·{' '}
-                    {subjectsUsed.length}{' '}
-                    subjects
-                  </p>
-                </div>
-
-                <Badge variant="secondary">
-                  {data.exams.find(
-                    (exam) =>
-                      String(exam.id) ===
-                      String(selectedExam),
-                  )?.name ??
-                    'Examination'}
-                </Badge>
-              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Enter and save marks to see
+                the ranking.
+              </p>
             </div>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      Position
+                    </TableHead>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    Adm No.
-                  </TableHead>
+                    <TableHead>
+                      Admission No.
+                    </TableHead>
 
-                  <TableHead>
-                    Learner
-                  </TableHead>
+                    <TableHead>
+                      Learner
+                    </TableHead>
 
-                  <TableHead>
-                    Stream
-                  </TableHead>
+                    <TableHead>
+                      Subjects
+                    </TableHead>
 
-                  <TableHead className="w-32">
-                    Score / 100
-                  </TableHead>
+                    <TableHead>
+                      Total
+                    </TableHead>
 
-                  <TableHead className="text-right">
-                    Grade
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
+                    <TableHead>
+                      Average
+                    </TableHead>
 
-              <TableBody>
-                {roster.map((student) => {
-                  const raw =
-                    draft[student.id] !==
-                    undefined
-                      ? draft[student.id]
-                      : existingScore(
-                          student.id,
-                        )?.toString() ??
-                        ''
+                    <TableHead>
+                      Mean Grade
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
 
-                  const num = Number(raw)
+                <TableBody>
+                  {ranking.map(
+                    (row) => (
+                      <TableRow
+                        key={
+                          row.student.id
+                        }
+                      >
+                        <TableCell className="font-bold">
+                          {row.position}
+                        </TableCell>
 
-                  const grade =
-                    raw !== '' &&
-                    !Number.isNaN(num)
-                      ? getGrade(num)
-                      : null
+                        <TableCell>
+                          {
+                            row.student
+                              .admissionNo
+                          }
+                        </TableCell>
 
-                  return (
-                    <TableRow
-                      key={student.id}
-                    >
-                      <TableCell className="font-mono text-muted-foreground">
-                        {student.admissionNo}
-                      </TableCell>
+                        <TableCell className="font-medium">
+                          {studentName(
+                            row.student,
+                          )}
+                        </TableCell>
 
-                      <TableCell className="font-medium">
-                        {studentName(student)}
-                      </TableCell>
+                        <TableCell>
+                          {row.count}
+                        </TableCell>
 
-                      <TableCell>
-                        {student.stream ??
-                          '—'}
-                      </TableCell>
+                        <TableCell>
+                          {row.total}
+                        </TableCell>
 
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={raw}
-                          onChange={(
-                            event,
-                          ) =>
-                            setDraft(
-                              (current) => ({
-                              
+                        <TableCell>
+                          {row.average.toFixed(
+                            2,
+                          )}
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge>
+                            {
+                              row.meanGrade
+                            }
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
