@@ -1,643 +1,403 @@
+ id="481mqp"
 'use client'
 
 import { useMemo, useState } from 'react'
 import {
-  Download,
-  FileSpreadsheet,
-  Printer,
+  BookOpen,
   Search,
-  Users,
+  GraduationCap,
+  Layers,
 } from 'lucide-react'
 
 import { useSchool } from '@/lib/store'
-import type { Student, Subject } from '@/lib/data'
+import type { Subject } from '@/lib/data'
 
 import { PageHeader } from '@/components/page-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+const CATEGORIES = [
+  'Pre-primary',
+  'Lower Primary',
+  'Upper Primary',
+  'Junior School',
+] as const
 
-const SCHOOL_CLASSES = [
-  'Play Group',
-  'PP1',
-  'PP2',
-  'Grade 1',
-  'Grade 2',
-  'Grade 3',
-  'Grade 4',
-  'Grade 5',
-  'Grade 6',
-  'Grade 7',
-  'Grade 8',
-  'Grade 9',
-]
+type Category = (typeof CATEGORIES)[number]
 
-type ClassCategory =
-  | 'Pre-primary'
-  | 'Lower Primary'
-  | 'Upper Primary'
-  | 'Junior School'
+function normalizeCategory(value: unknown): Category | null {
+  const category = String(value ?? '')
+    .trim()
+    .toLowerCase()
 
-function categoryForClass(className: string): ClassCategory {
   if (
-    className === 'Play Group' ||
-    className === 'PP1' ||
-    className === 'PP2'
+    category === 'pre-primary' ||
+    category === 'preprimary' ||
+    category === 'pre primary'
   ) {
     return 'Pre-primary'
   }
 
   if (
-    className === 'Grade 1' ||
-    className === 'Grade 2' ||
-    className === 'Grade 3'
+    category === 'lower primary' ||
+    category === 'lower-primary'
   ) {
     return 'Lower Primary'
   }
 
   if (
-    className === 'Grade 4' ||
-    className === 'Grade 5' ||
-    className === 'Grade 6'
+    category === 'upper primary' ||
+    category === 'upper-primary'
   ) {
     return 'Upper Primary'
   }
 
-  return 'Junior School'
-}
+  if (
+    category === 'junior school' ||
+    category === 'junior-school' ||
+    category === 'junior secondary' ||
+    category === 'jss'
+  ) {
+    return 'Junior School'
+  }
 
-function csvEscape(value: unknown) {
-  const text = String(value ?? '')
-  return `"${text.replace(/"/g, '""')}"`
-}
-
-function studentFullName(student: Student) {
-  return `${student.firstName ?? ''} ${student.lastName ?? ''}`.trim()
+  return null
 }
 
 function sortSubjects(subjects: Subject[]) {
   return [...subjects].sort((a, b) =>
-    a.name.localeCompare(b.name)
+    String(a.name ?? '').localeCompare(
+      String(b.name ?? ''),
+    ),
   )
 }
 
-export default function ClassListsPage() {
+export default function SubjectsPage() {
   const { data } = useSchool()
 
-  const [selectedClass, setSelectedClass] =
-    useState('Play Group')
-
   const [search, setSearch] = useState('')
+  const [selectedCategory, setSelectedCategory] =
+    useState<Category | 'All'>('All')
 
-  const selectedCategory =
-    categoryForClass(selectedClass)
-
-  const classStudents = useMemo(() => {
+  const subjects = useMemo(() => {
     const term = search.trim().toLowerCase()
 
-    return data.students
-      .filter((student) => {
-        const studentClass = String(
-          student.classId ?? ''
+    return sortSubjects(
+      data.subjects.filter((subject) => {
+        const category = normalizeCategory(
+          subject.category,
         )
-          .trim()
-          .toLowerCase()
+
+        const matchesCategory =
+          selectedCategory === 'All' ||
+          category === selectedCategory
+
+        if (!matchesCategory) {
+          return false
+        }
+
+        if (!term) {
+          return true
+        }
 
         return (
-          studentClass ===
-          selectedClass.trim().toLowerCase()
-        )
-      })
-      .filter((student) => {
-        if (!term) return true
-
-        return (
-          studentFullName(student)
+          String(subject.name ?? '')
             .toLowerCase()
             .includes(term) ||
-          String(student.admissionNo ?? '')
+          String(subject.code ?? '')
+            .toLowerCase()
+            .includes(term) ||
+          String(subject.category ?? '')
             .toLowerCase()
             .includes(term)
         )
-      })
-      .sort((a, b) =>
-        studentFullName(a).localeCompare(
-          studentFullName(b)
-        )
-      )
-  }, [data.students, selectedClass, search])
-
-  const classSubjects = useMemo(() => {
-    const subjects = data.subjects.filter(
-      (subject) =>
-        subject.category === selectedCategory
+      }),
     )
+  }, [
+    data.subjects,
+    search,
+    selectedCategory,
+  ])
 
-    return sortSubjects(subjects)
-  }, [data.subjects, selectedCategory])
-
-  function downloadMarksSheet() {
-    if (classStudents.length === 0) {
-      return
+  const categoryCounts = useMemo(() => {
+    const counts: Record<Category, number> = {
+      'Pre-primary': 0,
+      'Lower Primary': 0,
+      'Upper Primary': 0,
+      'Junior School': 0,
     }
 
-    const headers = [
-      'No.',
-      'Admission Number',
-      'Student Name',
-      'Gender',
-      ...classSubjects.map(
-        (subject) => subject.name
-      ),
-    ]
-
-    const rows = classStudents.map(
-      (student, index) => [
-        index + 1,
-        student.admissionNo ?? '',
-        studentFullName(student),
-        student.gender ?? '',
-        ...classSubjects.map(() => ''),
-      ]
-    )
-
-    const csv = [
-      [`${selectedClass} Marks Sheet`],
-      [`Learning Level: ${selectedCategory}`],
-      [`Students: ${classStudents.length}`],
-      [],
-      headers,
-      ...rows,
-    ]
-      .map((row) =>
-        row.map(csvEscape).join(',')
-      )
-      .join('\n')
-
-    const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;',
-    })
-
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-
-    link.href = url
-    link.download =
-      `${selectedClass.replace(/\s+/g, '_')}_Marks_Sheet.csv`
-
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    URL.revokeObjectURL(url)
-  }
-
-  function downloadAllClassLists() {
-    SCHOOL_CLASSES.forEach((className) => {
-      const students = data.students
-        .filter(
-          (student) =>
-            String(student.classId ?? '')
-              .trim()
-              .toLowerCase() ===
-            className.trim().toLowerCase()
-        )
-        .sort((a, b) =>
-          studentFullName(a).localeCompare(
-            studentFullName(b)
-          )
-        )
-
-      const category =
-        categoryForClass(className)
-
-      const subjects = sortSubjects(
-        data.subjects.filter(
-          (subject) =>
-            subject.category === category
-        )
+    for (const subject of data.subjects) {
+      const category = normalizeCategory(
+        subject.category,
       )
 
-      if (students.length === 0) {
-        return
+      if (category) {
+        counts[category] += 1
       }
+    }
 
-      const headers = [
-        'No.',
-        'Admission Number',
-        'Student Name',
-        'Gender',
-        ...subjects.map(
-          (subject) => subject.name
-        ),
-      ]
-
-      const rows = students.map(
-        (student, index) => [
-          index + 1,
-          student.admissionNo ?? '',
-          studentFullName(student),
-          student.gender ?? '',
-          ...subjects.map(() => ''),
-        ]
-      )
-
-      const csv = [
-        [`${className} Marks Sheet`],
-        [`Learning Level: ${category}`],
-        [`Students: ${students.length}`],
-        [],
-        headers,
-        ...rows,
-      ]
-        .map((row) =>
-          row.map(csvEscape).join(',')
-        )
-        .join('\n')
-
-      const blob = new Blob([csv], {
-        type: 'text/csv;charset=utf-8;',
-      })
-
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-
-      link.href = url
-      link.download =
-        `${className.replace(/\s+/g, '_')}_Marks_Sheet.csv`
-
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      URL.revokeObjectURL(url)
-    })
-  }
-
-  function printClassList() {
-    window.print()
-  }
+    return counts
+  }, [data.subjects])
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="space-y-6">
       <PageHeader
-        title="Class Lists"
-        description="View each class separately with learning areas and subjects for manual marks entry."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={printClassList}
-              disabled={classStudents.length === 0}
-            >
-              <Printer className="size-4" />
-              Print
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={downloadAllClassLists}
-              disabled={data.students.length === 0}
-            >
-              <FileSpreadsheet className="size-4" />
-              Download All Classes
-            </Button>
-
-            <Button
-              onClick={downloadMarksSheet}
-              disabled={classStudents.length === 0}
-            >
-              <Download className="size-4" />
-              Download Marks Sheet
-            </Button>
-          </div>
-        }
+        title="Subjects"
+        description="View and manage the learning areas and subjects offered at Kanyunga Comprehensive School."
       />
 
+      {/* Summary */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {CATEGORIES.map((category) => (
+          <Card
+            key={category}
+            className="cursor-pointer transition-shadow hover:shadow-md"
+            onClick={() =>
+              setSelectedCategory(category)
+            }
+          >
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {category}
+                  </p>
+
+                  <p className="mt-2 text-3xl font-bold">
+                    {categoryCounts[category]}
+                  </p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {categoryCounts[category] === 1
+                      ? 'subject'
+                      : 'subjects'}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-primary/10 p-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Search and filter */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-            <div className="space-y-2">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            <div className="flex-1 space-y-2">
               <label className="text-sm font-medium">
-                Select Class
-              </label>
-
-              <Select
-                value={selectedClass}
-                onValueChange={(value) => {
-                  setSelectedClass(
-                    value || 'Play Group'
-                  )
-                  setSearch('')
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {SCHOOL_CLASSES.map(
-                    (className) => (
-                      <SelectItem
-                        key={className}
-                        value={className}
-                      >
-                        {className}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Search Students
+                Search Subjects
               </label>
 
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
                 <Input
-                  className="pl-9"
-                  placeholder="Search name or admission number..."
                   value={search}
                   onChange={(event) =>
                     setSearch(event.target.value)
                   }
+                  placeholder="Search by subject name or code..."
+                  className="pl-9"
                 />
               </div>
             </div>
 
-            <div className="flex items-end">
-              <Badge
-                variant="secondary"
-                className="h-10 px-4"
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedCategory('All')
+                }
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                  selectedCategory === 'All'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted'
+                }`}
               >
-                <Users className="mr-2 size-4" />
-                {classStudents.length} Students
-              </Badge>
+                All
+              </button>
+
+              {CATEGORIES.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() =>
+                    setSelectedCategory(category)
+                  }
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    selectedCategory === category
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Subjects list */}
       <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div>
-              <CardTitle>
-                {selectedClass} Class List
-              </CardTitle>
+        <CardContent className="p-0">
+          <div className="border-b p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  School Subjects
+                </h2>
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                {selectedCategory} ·{' '}
-                {classSubjects.length} learning areas /
-                subjects
-              </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {subjects.length}{' '}
+                  {subjects.length === 1
+                    ? 'subject'
+                    : 'subjects'}{' '}
+                  displayed
+                </p>
+              </div>
+
+              <Badge variant="secondary">
+                {selectedCategory === 'All'
+                  ? 'All Levels'
+                  : selectedCategory}
+              </Badge>
             </div>
-
-            <Badge
-              variant="outline"
-              className="sm:ml-auto"
-            >
-              {classStudents.length} students
-            </Badge>
           </div>
-        </CardHeader>
 
-        <CardContent>
-          {classStudents.length === 0 ? (
-            <div className="rounded-lg border border-dashed py-12 text-center">
-              <Users className="mx-auto mb-3 size-10 text-muted-foreground/50" />
+          {subjects.length === 0 ? (
+            <div className="p-12 text-center">
+              <BookOpen className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
 
-              <h3 className="font-medium">
-                No students found
-              </h3>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                There are no students registered in{' '}
-                {selectedClass}
-                {search
-                  ? ' matching your search.'
-                  : '.'}
-              </p>
-            </div>
-          ) : classSubjects.length === 0 ? (
-            <div className="rounded-lg border border-dashed py-12 text-center">
-              <FileSpreadsheet className="mx-auto mb-3 size-10 text-muted-foreground/50" />
-
-              <h3 className="font-medium">
+              <h3 className="font-semibold">
                 No subjects found
               </h3>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Add subjects under the Subjects page
-                for the {selectedCategory} level.
+                {search
+                  ? 'Try changing your search.'
+                  : 'No subjects have been registered yet.'}
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12 text-center">
-                      No.
-                    </TableHead>
+            <div className="divide-y">
+              {subjects.map((subject) => {
+                const category =
+                  normalizeCategory(
+                    subject.category,
+                  )
 
-                    <TableHead className="min-w-32">
-                      Admission No.
-                    </TableHead>
+                return (
+                  <div
+                    key={subject.id}
+                    className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-lg bg-primary/10 p-3">
+                        <BookOpen className="h-5 w-5 text-primary" />
+                      </div>
 
-                    <TableHead className="min-w-48">
-                      Student Name
-                    </TableHead>
+                      <div>
+                        <h3 className="font-semibold">
+                          {subject.name}
+                        </h3>
 
-                    <TableHead className="min-w-24">
-                      Gender
-                    </TableHead>
-
-                    {classSubjects.map(
-                      (subject) => (
-                        <TableHead
-                          key={subject.id}
-                          className="min-w-32 text-center"
-                        >
-                          <div>
-                            {subject.name}
-                          </div>
-
-                          <div className="text-[10px] font-normal text-muted-foreground">
-                            {subject.code}
-                          </div>
-                        </TableHead>
-                      )
-                    )}
-                  </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                  {classStudents.map(
-                    (student, index) => (
-                      <TableRow key={student.id}>
-                        <TableCell className="text-center font-medium">
-                          {index + 1}
-                        </TableCell>
-
-                        <TableCell className="font-mono text-xs">
-                          {student.admissionNo}
-                        </TableCell>
-
-                        <TableCell className="font-medium">
-                          {studentFullName(student)}
-                        </TableCell>
-
-                        <TableCell>
-                          {student.gender || '—'}
-                        </TableCell>
-
-                        {classSubjects.map(
-                          (subject) => (
-                            <TableCell
-                              key={subject.id}
-                              className="h-12 border-l text-center"
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          {subject.code && (
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-xs"
                             >
-                              <span className="text-muted-foreground/30">
-                                —
-                              </span>
-                            </TableCell>
-                          )
-                        )}
-                      </TableRow>
-                    )
-                  )}
-                </TableBody>
-              </Table>
+                              {subject.code}
+                            </Badge>
+                          )}
+
+                          {category && (
+                            <Badge
+                              variant="secondary"
+                            >
+                              {category}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <GraduationCap className="h-4 w-4" />
+
+                      <span>
+                        {category || 'School subject'}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Card className="print-only">
-        <CardContent className="pt-6">
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold">
-              {data.school.name}
-            </h1>
+      {/* Learning levels */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {CATEGORIES.map((category) => {
+          const categorySubjects =
+            sortSubjects(
+              data.subjects.filter(
+                (subject) =>
+                  normalizeCategory(
+                    subject.category,
+                  ) === category,
+              ),
+            )
 
-            <h2 className="mt-2 text-xl font-semibold">
-              {selectedClass} Marks Sheet
-            </h2>
+          return (
+            <Card key={category}>
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <Layers className="h-5 w-5 text-primary" />
+                  </div>
 
-            <p className="text-sm">
-              {selectedCategory}
-            </p>
-          </div>
+                  <div>
+                    <h3 className="font-semibold">
+                      {category}
+                    </h3>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>No.</TableHead>
-                  <TableHead>Admission No.</TableHead>
-                  <TableHead>Student Name</TableHead>
+                    <p className="text-sm text-muted-foreground">
+                      {categorySubjects.length}{' '}
+                      {categorySubjects.length === 1
+                        ? 'subject'
+                        : 'subjects'}
+                    </p>
+                  </div>
+                </div>
 
-                  {classSubjects.map(
-                    (subject) => (
-                      <TableHead
-                        key={subject.id}
-                        className="text-center"
-                      >
-                        {subject.name}
-                      </TableHead>
-                    )
-                  )}
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {classStudents.map(
-                  (student, index) => (
-                    <TableRow key={student.id}>
-                      <TableCell>
-                        {index + 1}
-                      </TableCell>
-
-                      <TableCell>
-                        {student.admissionNo}
-                      </TableCell>
-
-                      <TableCell>
-                        {studentFullName(student)}
-                      </TableCell>
-
-                      {classSubjects.map(
-                        (subject) => (
-                          <TableCell
-                            key={subject.id}
-                            className="h-12"
-                          />
-                        )
-                      )}
-                    </TableRow>
-                  )
+                {categorySubjects.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {categorySubjects.map(
+                      (subject) => (
+                        <Badge
+                          key={subject.id}
+                          variant="outline"
+                        >
+                          {subject.name}
+                        </Badge>
+                      ),
+                    )}
+                  </div>
                 )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <style jsx global>{`
-        .print-only {
-          display: none;
-        }
-
-        @media print {
-          body {
-            background: white !important;
-          }
-
-          body * {
-            visibility: hidden;
-          }
-
-          .print-only,
-          .print-only * {
-            visibility: visible;
-          }
-
-          .print-only {
-            display: block;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-
-          @page {
-            size: landscape;
-            margin: 10mm;
-          }
-        }
-      `}</style>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
     </div>
   )
 }
