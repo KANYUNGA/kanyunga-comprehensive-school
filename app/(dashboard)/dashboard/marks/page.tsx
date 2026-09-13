@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -801,7 +802,7 @@ export default function MarksPage() {
                               </th>
 
                               {classSubjects.map(
-                      (subject) => (
+                                (subject) => (
                                   <th
                                     key={subject.id}
                                     className="min-w-36 border-r p-3 text-center"
