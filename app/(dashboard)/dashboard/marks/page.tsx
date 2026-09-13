@@ -1,7 +1,8 @@
+typescript
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Download, RefreshCw } from 'lucide-react'
+import { Download, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
 
 import { useSchool } from '@/lib/store'
 import { PageHeader } from '@/components/page-header'
@@ -57,14 +58,13 @@ export default function MarksPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState<
+    'success' | 'error' | 'info' | ''
+  >('')
 
-  /*
-   * Load all marks-related data.
-   */
   async function loadData() {
     try {
       setLoading(true)
-      setMessage('')
 
       const [
         studentsResponse,
@@ -72,18 +72,10 @@ export default function MarksPage() {
         examsResponse,
         marksResponse,
       ] = await Promise.all([
-        fetch('/api/students', {
-          cache: 'no-store',
-        }),
-        fetch('/api/subjects', {
-          cache: 'no-store',
-        }),
-        fetch('/api/exams', {
-          cache: 'no-store',
-        }),
-        fetch('/api/marks', {
-          cache: 'no-store',
-        }),
+        fetch('/api/students', { cache: 'no-store' }),
+        fetch('/api/subjects', { cache: 'no-store' }),
+        fetch('/api/exams', { cache: 'no-store' }),
+        fetch('/api/marks', { cache: 'no-store' }),
       ])
 
       if (!studentsResponse.ok) {
@@ -107,29 +99,33 @@ export default function MarksPage() {
       const examsData = await examsResponse.json()
       const marksData = await marksResponse.json()
 
-      const loadedStudents: Student[] = Array.isArray(
-        studentsData
-      )
-        ? studentsData
-        : studentsData.data ??
-          studentsData.students ??
-          []
+      const loadedStudents: Student[] =
+        Array.isArray(studentsData)
+          ? studentsData
+          : studentsData.data ??
+            studentsData.students ??
+            []
 
-      const loadedSubjects: Subject[] = Array.isArray(
-        subjectsData
-      )
-        ? subjectsData
-        : subjectsData.data ??
-          subjectsData.subjects ??
-          []
+      const loadedSubjects: Subject[] =
+        Array.isArray(subjectsData)
+          ? subjectsData
+          : subjectsData.data ??
+            subjectsData.subjects ??
+            []
 
-      const loadedExams: Exam[] = Array.isArray(examsData)
-        ? examsData
-        : examsData.data ?? examsData.exams ?? []
+      const loadedExams: Exam[] =
+        Array.isArray(examsData)
+          ? examsData
+          : examsData.data ??
+            examsData.exams ??
+            []
 
-      const loadedMarks: Mark[] = Array.isArray(marksData)
-        ? marksData
-        : marksData.data ?? marksData.marks ?? []
+      const loadedMarks: Mark[] =
+        Array.isArray(marksData)
+          ? marksData
+          : marksData.data ??
+            marksData.marks ??
+            []
 
       setStudents(loadedStudents)
       setSubjects(loadedSubjects)
@@ -143,6 +139,7 @@ export default function MarksPage() {
           ? error.message
           : 'Failed to load marks data.'
       )
+      setMessageType('error')
     } finally {
       setLoading(false)
     }
@@ -152,17 +149,13 @@ export default function MarksPage() {
     loadData()
   }, [])
 
-  /*
-   * Get classes directly from students.
-   *
-   * Each class becomes its own separate marks sheet.
-   */
   const classes = useMemo(() => {
     const uniqueClasses = Array.from(
       new Set(
         students
           .filter(
-            (student) => student.status !== 'Inactive'
+            (student) =>
+              student.status !== 'Inactive'
           )
           .map((student) =>
             String(student.classId ?? '').trim()
@@ -179,9 +172,6 @@ export default function MarksPage() {
     )
   }, [students])
 
-  /*
-   * Determine the subject category for a selected class.
-   */
   function getCategoryForClass(
     className: string
   ): string {
@@ -227,9 +217,6 @@ export default function MarksPage() {
     return ''
   }
 
-  /*
-   * Subjects/learning areas for the selected class.
-   */
   const classSubjects = useMemo(() => {
     if (!selectedClass) {
       return []
@@ -248,16 +235,11 @@ export default function MarksPage() {
         category.toLowerCase()
     )
 
-    /*
-     * If there are no category matches, show all subjects
-     * rather than leaving the marks sheet empty.
-     */
-    return matching.length > 0 ? matching : subjects
+    return matching.length > 0
+      ? matching
+      : subjects
   }, [subjects, selectedClass])
 
-  /*
-   * Students belonging ONLY to the selected class.
-   */
   const classStudents = useMemo(() => {
     if (!selectedClass) {
       return []
@@ -277,9 +259,6 @@ export default function MarksPage() {
       )
   }, [students, selectedClass])
 
-  /*
-   * Create a unique key for every student + subject combination.
-   */
   function scoreKey(
     studentId: string,
     subjectId: string
@@ -287,9 +266,6 @@ export default function MarksPage() {
     return `${studentId}__${subjectId}`
   }
 
-  /*
-   * Load existing marks whenever class/exam changes.
-   */
   useEffect(() => {
     if (!selectedClass || !selectedExam) {
       setScores({})
@@ -324,9 +300,6 @@ export default function MarksPage() {
     classStudents,
   ])
 
-  /*
-   * Update a single mark cell.
-   */
   function updateScore(
     studentId: string,
     subjectId: string,
@@ -337,7 +310,6 @@ export default function MarksPage() {
         ...current,
         [scoreKey(studentId, subjectId)]: '',
       }))
-
       return
     }
 
@@ -359,22 +331,22 @@ export default function MarksPage() {
     }))
   }
 
-  /*
-   * Save every entered mark on the current class sheet.
-   */
   async function saveMarks() {
     if (!selectedClass) {
       setMessage('Please select a class.')
+      setMessageType('error')
       return
     }
 
     if (!selectedExam) {
       setMessage('Please select an exam.')
+      setMessageType('error')
       return
     }
 
     if (classStudents.length === 0) {
       setMessage('No students found in this class.')
+      setMessageType('error')
       return
     }
 
@@ -382,6 +354,7 @@ export default function MarksPage() {
       setMessage(
         'No subjects or learning areas found for this class.'
       )
+      setMessageType('error')
       return
     }
 
@@ -426,12 +399,18 @@ export default function MarksPage() {
       setMessage(
         'Enter at least one mark before saving.'
       )
+      setMessageType('error')
       return
     }
 
     try {
       setSaving(true)
-      setMessage('')
+      setMessage(
+        `Saving ${entries.length} mark${
+          entries.length === 1 ? '' : 's'
+        }...`
+      )
+      setMessageType('info')
 
       const response = await fetch('/api/marks', {
         method: 'POST',
@@ -448,45 +427,46 @@ export default function MarksPage() {
 
       if (!response.ok) {
         throw new Error(
-          result.error || 'Failed to save marks.'
+          result.error ||
+            result.message ||
+            'Failed to save marks.'
         )
       }
 
-      setMessage('Marks saved successfully.')
+      setMessage(
+        `✓ ${entries.length} mark${
+          entries.length === 1 ? '' : 's'
+        } saved successfully.`
+      )
+      setMessageType('success')
 
       await loadData()
     } catch (error) {
-      console.error(error)
+      console.error('Save marks error:', error)
 
       setMessage(
         error instanceof Error
           ? error.message
           : 'Failed to save marks.'
       )
+      setMessageType('error')
     } finally {
       setSaving(false)
     }
   }
 
-  /*
-   * Download ONLY the selected class.
-   *
-   * The downloaded CSV contains:
-   * Admission Number
-   * Student Name
-   * Stream
-   * Each subject/learning area
-   *
-   * It does NOT contain guardian information.
-   */
   function downloadClassMarks() {
     if (!selectedClass) {
       setMessage('Please select a class first.')
+      setMessageType('error')
       return
     }
 
     if (classStudents.length === 0) {
-      setMessage('There are no students in this class.')
+      setMessage(
+        'There are no students in this class.'
+      )
+      setMessageType('error')
       return
     }
 
@@ -494,6 +474,7 @@ export default function MarksPage() {
       setMessage(
         'There are no subjects or learning areas for this class.'
       )
+      setMessageType('error')
       return
     }
 
@@ -537,7 +518,6 @@ export default function MarksPage() {
 
     function csvEscape(value: unknown) {
       const text = String(value ?? '')
-
       return `"${text.replace(/"/g, '""')}"`
     }
 
@@ -548,9 +528,6 @@ export default function MarksPage() {
       ),
     ].join('\n')
 
-    /*
-     * UTF-8 BOM helps Excel open the CSV correctly.
-     */
     const blob = new Blob(
       ['\uFEFF' + csv],
       {
@@ -559,7 +536,6 @@ export default function MarksPage() {
     )
 
     const url = URL.createObjectURL(blob)
-
     const link = document.createElement('a')
 
     link.href = url
@@ -581,9 +557,7 @@ export default function MarksPage() {
       `${safeClass}_${safeExam}_Marks_List.csv`
 
     document.body.appendChild(link)
-
     link.click()
-
     document.body.removeChild(link)
 
     URL.revokeObjectURL(url)
@@ -591,12 +565,19 @@ export default function MarksPage() {
     setMessage(
       `${selectedClass} marks list downloaded successfully.`
     )
+    setMessageType('success')
   }
 
   const selectedExamObject = exams.find(
     (exam) =>
       String(exam.id) === String(selectedExam)
   )
+
+  const role = String(auth?.role ?? '').toLowerCase()
+
+  const canSaveMarks =
+    role === 'admin' ||
+    role === 'teacher'
 
   return (
     <div className="flex flex-col gap-6">
@@ -637,6 +618,7 @@ export default function MarksPage() {
                       )
                       setScores({})
                       setMessage('')
+                      setMessageType('')
                     }}
                     className="w-full rounded-md border bg-background p-2"
                   >
@@ -667,6 +649,7 @@ export default function MarksPage() {
                         event.target.value
                       )
                       setMessage('')
+                      setMessageType('')
                     }}
                     className="w-full rounded-md border bg-background p-2"
                   >
@@ -690,7 +673,7 @@ export default function MarksPage() {
                   <Button
                     variant="outline"
                     onClick={loadData}
-                    disabled={loading}
+                    disabled={loading || saving}
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Refresh
@@ -812,164 +795,3 @@ export default function MarksPage() {
 
                               {classSubjects.map(
                                 (subject) => (
-                                  <th
-                                    key={
-                                      subject.id
-                                    }
-                                    className="min-w-36 border-r p-3 text-center"
-                                  >
-                                    <div className="font-semibold">
-                                      {
-                                        subject.name
-                                      }
-                                    </div>
-
-                                    <div className="text-xs font-normal text-muted-foreground">
-                                      {
-                                        subject.code
-                                      }
-                                    </div>
-                                  </th>
-                                )
-                              )}
-                            </tr>
-                          </thead>
-
-                          <tbody>
-                            {classStudents.map(
-                              (
-                                student,
-                                index
-                              ) => (
-                                <tr
-                                  key={student.id}
-                                  className="border-b last:border-0"
-                                >
-                                  <td className="sticky left-0 z-10 border-r bg-background p-3">
-                                    {index + 1}
-                                  </td>
-
-                                  <td className="sticky left-12 z-10 border-r bg-background p-3 font-mono text-xs">
-                                    {
-                                      student.admissionNo
-                                    }
-                                  </td>
-
-                                  <td className="sticky left-[9rem] z-10 border-r bg-background p-3 font-medium">
-                                    {
-                                      student.firstName
-                                    }{' '}
-                                    {
-                                      student.lastName
-                                    }
-                                  </td>
-
-                                  <td className="border-r p-3 text-muted-foreground">
-                                    {student.stream ||
-                                      '—'}
-                                  </td>
-
-                                  {classSubjects.map(
-                                    (
-                                      subject
-                                    ) => {
-                                      const key =
-                                        scoreKey(
-                                          String(
-                                            student.id
-                                          ),
-                                          String(
-                                            subject.id
-                                          )
-                                        )
-
-                                      return (
-                                        <td
-                                          key={
-                                            subject.id
-                                          }
-                                          className="border-r p-2 text-center"
-                                        >
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={
-                                              scores[
-                                                key
-                                              ] ??
-                                              ''
-                                            }
-                                            onChange={(
-                                              event
-                                            ) =>
-                                              updateScore(
-                                                String(
-                                                  student.id
-                                                ),
-                                                String(
-                                                  subject.id
-                                                ),
-                                                event
-                                                  .target
-                                                  .value
-                                              )
-                                            }
-                                            className="h-9 w-24 rounded-md border bg-background px-2 text-center outline-none focus:ring-2 focus:ring-ring"
-                                            aria-label={`${subject.name} mark for ${student.firstName} ${student.lastName}`}
-                                          />
-                                        </td>
-                                      )
-                                    }
-                                  )}
-                                </tr>
-                              )
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                        {auth?.role ===
-                          'admin' && (
-                          <Button
-                            onClick={
-                              saveMarks
-                            }
-                            disabled={saving}
-                          >
-                            {saving
-                              ? 'Saving...'
-                              : 'Save All Marks'}
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          onClick={
-                            downloadClassMarks
-                          }
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Download{' '}
-                          {selectedClass}{' '}
-                          Class List
-                        </Button>
-
-                        {message && (
-                          <p className="text-sm text-muted-foreground">
-                            {message}
-                          </p>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-        </>
-      )}
-    </div>
-  )
-}
-
