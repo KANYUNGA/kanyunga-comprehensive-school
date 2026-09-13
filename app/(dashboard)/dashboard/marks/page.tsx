@@ -1,145 +1,195 @@
+"use client"
 
-'use client'
-
-import { useEffect, useMemo, useState } from 'react'
-import { Download, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
-
-import { useSchool } from '@/lib/store'
-import { PageHeader } from '@/components/page-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { useEffect, useMemo, useState } from "react"
+import {
+  Download,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+} from "lucide-react"
+import { useSchool } from "@/lib/store"
 
 type Student = {
   id: string
   admissionNo: string
   firstName: string
-  lastName: string
-  classId: string
+  middleName?: string
+  lastName?: string
+  gender?: string
+  className?: string
   stream?: string
-  status?: string
 }
 
 type Subject = {
   id: string
+  code?: string
   name: string
-  code: string
-  category: string
 }
 
 type Exam = {
   id: string
   name: string
-  term: string
-  year: number
-  outOf: number
+  term?: string
+  year?: number
+  className?: string
 }
 
 type Mark = {
-  id: string
-  examId: string
+  id?: string
   studentId: string
   subjectId: string
+  examId: string
   score: number
+}
+
+type Assignment = {
+  assignment_id: string
+  teacher_id: string
+  subject_id: string
+  subject_name: string
+  subject_code?: string
+  class_id: string
+  class_name: string
+}
+
+function normalizeClassName(value: string) {
+  const v = String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/-/g, "")
+
+  if (v === "playgroup" || v === "play") return "playgroup"
+
+  if (
+    v === "pp1" ||
+    v === "preprimary1" ||
+    v === "preprimaryone"
+  ) {
+    return "pp1"
+  }
+
+  if (
+    v === "pp2" ||
+    v === "preprimary2" ||
+    v === "preprimarytwo"
+  ) {
+    return "pp2"
+  }
+
+  return v
+}
+
+function getStudentName(student: Student) {
+  return [student.firstName, student.middleName, student.lastName]
+    .filter(Boolean)
+    .join(" ")
 }
 
 export default function MarksPage() {
   const { role } = useSchool()
 
+  const normalizedRole = String(role ?? "").toLowerCase()
+
+  const isAdmin = normalizedRole === "admin"
+  const isTeacher = normalizedRole === "teacher"
+
   const [students, setStudents] = useState<Student[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [exams, setExams] = useState<Exam[]>([])
   const [marks, setMarks] = useState<Mark[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
 
-  const [selectedClass, setSelectedClass] = useState('')
-  const [selectedExam, setSelectedExam] = useState('')
+  const [selectedClass, setSelectedClass] = useState("")
+  const [selectedExam, setSelectedExam] = useState("")
+  const [selectedSubject, setSelectedSubject] = useState("")
 
   const [scores, setScores] = useState<Record<string, string>>({})
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
+
+  const [message, setMessage] = useState("")
   const [messageType, setMessageType] = useState<
-    'success' | 'error' | 'info' | ''
-  >('')
+    "success" | "error" | ""
+  >("")
 
   async function loadData() {
     try {
       setLoading(true)
+      setMessage("")
 
       const [
         studentsResponse,
         subjectsResponse,
         examsResponse,
         marksResponse,
+        assignmentsResponse,
       ] = await Promise.all([
-        fetch('/api/students', { cache: 'no-store' }),
-        fetch('/api/subjects', { cache: 'no-store' }),
-        fetch('/api/exams', { cache: 'no-store' }),
-        fetch('/api/marks', { cache: 'no-store' }),
+        fetch("/api/students"),
+        fetch("/api/subjects"),
+        fetch("/api/exams"),
+        fetch("/api/marks"),
+        fetch("/api/teacher-subject-assignments"),
       ])
 
       if (!studentsResponse.ok) {
-        throw new Error('Failed to load students.')
+        throw new Error("Failed to load students")
       }
 
       if (!subjectsResponse.ok) {
-        throw new Error('Failed to load subjects.')
+        throw new Error("Failed to load subjects")
       }
 
       if (!examsResponse.ok) {
-        throw new Error('Failed to load exams.')
+        throw new Error("Failed to load exams")
       }
 
       if (!marksResponse.ok) {
-        throw new Error('Failed to load marks.')
+        throw new Error("Failed to load marks")
       }
 
-      const studentsData = await studentsResponse.json()
-      const subjectsData = await subjectsResponse.json()
-      const examsData = await examsResponse.json()
-      const marksData = await marksResponse.json()
+      if (!assignmentsResponse.ok) {
+        throw new Error("Failed to load teacher assignments")
+      }
 
-      const loadedStudents: Student[] =
-        Array.isArray(studentsData)
-          ? studentsData
-          : studentsData.data ??
-            studentsData.students ??
-            []
+      const studentsResult = await studentsResponse.json()
+      const subjectsResult = await subjectsResponse.json()
+      const examsResult = await examsResponse.json()
+      const marksResult = await marksResponse.json()
+      const assignmentsResult = await assignmentsResponse.json()
 
-      const loadedSubjects: Subject[] =
-        Array.isArray(subjectsData)
-          ? subjectsData
-          : subjectsData.data ??
-            subjectsData.subjects ??
-            []
+      const studentData =
+        studentsResult.data ?? studentsResult.students ?? []
 
-      const loadedExams: Exam[] =
-        Array.isArray(examsData)
-          ? examsData
-          : examsData.data ??
-            examsData.exams ??
-            []
+      const subjectData =
+        subjectsResult.data ?? subjectsResult.subjects ?? []
 
-      const loadedMarks: Mark[] =
-        Array.isArray(marksData)
-          ? marksData
-          : marksData.data ??
-            marksData.marks ??
-            []
+      const examData =
+        examsResult.data ?? examsResult.exams ?? []
 
-      setStudents(loadedStudents)
-      setSubjects(loadedSubjects)
-      setExams(loadedExams)
-      setMarks(loadedMarks)
+      const markData =
+        marksResult.data ?? marksResult.marks ?? []
+
+      const assignmentData =
+        assignmentsResult.data ??
+        assignmentsResult.assignments ??
+        []
+
+      setStudents(studentData)
+      setSubjects(subjectData)
+      setExams(examData)
+      setMarks(markData)
+      setAssignments(assignmentData)
     } catch (error) {
-      console.error('Failed to load marks data:', error)
+      console.error(error)
 
       setMessage(
         error instanceof Error
           ? error.message
-          : 'Failed to load marks data.'
+          : "Failed to load marks data"
       )
-      setMessageType('error')
+
+      setMessageType("error")
     } finally {
       setLoading(false)
     }
@@ -150,274 +200,292 @@ export default function MarksPage() {
   }, [])
 
   const classes = useMemo(() => {
-    const uniqueClasses = Array.from(
-      new Set(
-        students
-          .filter(
-            (student) =>
-              student.status !== 'Inactive'
-          )
-          .map((student) =>
-            String(student.classId ?? '').trim()
-          )
-          .filter(Boolean)
-      )
-    )
+    const names = students
+      .map((student) => student.className)
+      .filter(Boolean) as string[]
 
-    return uniqueClasses.sort((a, b) =>
+    return Array.from(new Set(names)).sort((a, b) =>
       a.localeCompare(b, undefined, {
         numeric: true,
-        sensitivity: 'base',
+        sensitivity: "base",
       })
     )
   }, [students])
 
-  function getCategoryForClass(
-    className: string
-  ): string {
-    const value = className.toLowerCase()
-
-    if (
-      value.includes('play') ||
-      value.includes('pp1') ||
-      value.includes('pp2') ||
-      value.includes('pre-primary') ||
-      value.includes('pre primary')
-    ) {
-      return 'Pre-primary'
-    }
-
-    if (
-      value.includes('grade 1') ||
-      value.includes('grade 2') ||
-      value.includes('grade 3') ||
-      value.includes('lower primary')
-    ) {
-      return 'Lower Primary'
-    }
-
-    if (
-      value.includes('grade 4') ||
-      value.includes('grade 5') ||
-      value.includes('grade 6') ||
-      value.includes('upper primary')
-    ) {
-      return 'Upper Primary'
-    }
-
-    if (
-      value.includes('grade 7') ||
-      value.includes('grade 8') ||
-      value.includes('grade 9') ||
-      value.includes('junior')
-    ) {
-      return 'Junior School'
-    }
-
-    return ''
-  }
-
-  const classSubjects = useMemo(() => {
-    if (!selectedClass) {
-      return []
-    }
-
-    const category =
-      getCategoryForClass(selectedClass)
-
-    if (!category) {
-      return subjects
-    }
-
-    const matching = subjects.filter(
-      (subject) =>
-        subject.category.toLowerCase() ===
-        category.toLowerCase()
-    )
-
-    return matching.length > 0
-      ? matching
-      : subjects
-  }, [subjects, selectedClass])
-
   const classStudents = useMemo(() => {
-    if (!selectedClass) {
-      return []
-    }
+    if (!selectedClass) return []
 
-    return students
-      .filter(
-        (student) =>
-          String(student.classId ?? '').trim() ===
-            selectedClass &&
-          student.status !== 'Inactive'
-      )
-      .sort((a, b) =>
-        `${a.firstName} ${a.lastName}`.localeCompare(
-          `${b.firstName} ${b.lastName}`
-        )
-      )
+    return students.filter(
+      (student) =>
+        normalizeClassName(student.className ?? "") ===
+        normalizeClassName(selectedClass)
+    )
   }, [students, selectedClass])
 
-  function scoreKey(
-    studentId: string,
-    subjectId: string
-  ) {
-    return `${studentId}__${subjectId}`
-  }
+  const classSubjects = useMemo(() => {
+    if (!selectedClass) return subjects
+
+    const className = normalizeClassName(selectedClass)
+
+    if (
+      className === "playgroup" ||
+      className === "pp1" ||
+      className === "pp2"
+    ) {
+      return subjects.filter((subject) => {
+        const name = subject.name.toLowerCase()
+
+        return (
+          name.includes("activity") ||
+          name.includes("religious") ||
+          name.includes("environmental") ||
+          name.includes("mathematical") ||
+          name.includes("creative")
+        )
+      })
+    }
+
+    if (
+      className === "grade1" ||
+      className === "grade2" ||
+      className === "grade3"
+    ) {
+      return subjects.filter((subject) => {
+        const name = subject.name.toLowerCase()
+
+        return (
+          name.includes("activities") ||
+          name.includes("english") ||
+          name.includes("kiswahili") ||
+          name.includes("religious") ||
+          name.includes("environmental") ||
+          name.includes("mathematical") ||
+          name.includes("creative")
+        )
+      })
+    }
+
+    if (
+      className === "grade4" ||
+      className === "grade5" ||
+      className === "grade6"
+    ) {
+      return subjects.filter((subject) => {
+        const name = subject.name.toLowerCase()
+
+        return (
+          name.includes("english") ||
+          name.includes("kiswahili") ||
+          name.includes("religious") ||
+          name.includes("social") ||
+          name.includes("science") ||
+          name.includes("mathematics") ||
+          name.includes("agriculture") ||
+          name.includes("creative")
+        )
+      })
+    }
+
+    if (
+      className === "grade7" ||
+      className === "grade8" ||
+      className === "grade9"
+    ) {
+      return subjects.filter((subject) => {
+        const name = subject.name.toLowerCase()
+
+        return (
+          name.includes("mathematics") ||
+          name.includes("integrated science") ||
+          name.includes("pre-technical") ||
+          name.includes("agriculture") ||
+          name.includes("english") ||
+          name.includes("kiswahili") ||
+          name.includes("religious") ||
+          name.includes("creative")
+        )
+      })
+    }
+
+    return subjects
+  }, [subjects, selectedClass])
+
+  const availableSubjects = useMemo(() => {
+    if (!selectedClass) return []
+
+    if (isAdmin) {
+      return classSubjects
+    }
+
+    if (!isTeacher) {
+      return []
+    }
+
+    const selectedClassKey =
+      normalizeClassName(selectedClass)
+
+    const teacherAssignments = assignments.filter(
+      (assignment) =>
+        normalizeClassName(assignment.class_name) ===
+        selectedClassKey
+    )
+
+    const assignedSubjectIds = new Set(
+      teacherAssignments.map((assignment) =>
+        String(assignment.subject_id)
+      )
+    )
+
+    return classSubjects.filter((subject) =>
+      assignedSubjectIds.has(String(subject.id))
+    )
+  }, [
+    selectedClass,
+    assignments,
+    classSubjects,
+    isAdmin,
+    isTeacher,
+  ])
 
   useEffect(() => {
-    if (!selectedClass || !selectedExam) {
+    setSelectedSubject("")
+    setScores({})
+  }, [selectedClass])
+
+  useEffect(() => {
+    if (!selectedExam || !selectedSubject) {
       setScores({})
       return
     }
 
-    const existing: Record<string, string> = {}
+    const nextScores: Record<string, string> = {}
 
-    marks.forEach((mark) => {
-      if (
-        String(mark.examId) === String(selectedExam) &&
-        classStudents.some(
-          (student) =>
-            String(student.id) ===
-            String(mark.studentId)
-        )
-      ) {
-        existing[
-          scoreKey(
-            String(mark.studentId),
-            String(mark.subjectId)
-          )
-        ] = String(mark.score)
-      }
-    })
+    for (const student of classStudents) {
+      const existingMark = marks.find(
+        (mark) =>
+          String(mark.studentId) === String(student.id) &&
+          String(mark.subjectId) === String(selectedSubject) &&
+          String(mark.examId) === String(selectedExam)
+      )
 
-    setScores(existing)
+      nextScores[String(student.id)] =
+        existingMark?.score !== undefined &&
+        existingMark?.score !== null
+          ? String(existingMark.score)
+          : ""
+    }
+
+    setScores(nextScores)
   }, [
-    selectedClass,
     selectedExam,
-    marks,
+    selectedSubject,
     classStudents,
+    marks,
   ])
+
+  useEffect(() => {
+    if (!selectedSubject) return
+
+    const stillAvailable = availableSubjects.some(
+      (subject) =>
+        String(subject.id) === String(selectedSubject)
+    )
+
+    if (!stillAvailable) {
+      setSelectedSubject("")
+    }
+  }, [availableSubjects, selectedSubject])
+
+  const selectedSubjectObject = useMemo(() => {
+    return availableSubjects.find(
+      (subject) =>
+        String(subject.id) === String(selectedSubject)
+    )
+  }, [availableSubjects, selectedSubject])
 
   function updateScore(
     studentId: string,
-    subjectId: string,
     value: string
   ) {
-    if (value === '') {
-      setScores((current) => ({
-        ...current,
-        [scoreKey(studentId, subjectId)]: '',
+    if (value === "") {
+      setScores((previous) => ({
+        ...previous,
+        [studentId]: "",
       }))
       return
     }
 
-    const number = Number(value)
+    const numericValue = Number(value)
 
-    if (Number.isNaN(number)) {
-      return
-    }
+    if (Number.isNaN(numericValue)) return
 
-    const limited = Math.max(
+    const clamped = Math.max(
       0,
-      Math.min(100, number)
+      Math.min(100, numericValue)
     )
 
-    setScores((current) => ({
-      ...current,
-      [scoreKey(studentId, subjectId)]:
-        String(limited),
+    setScores((previous) => ({
+      ...previous,
+      [studentId]: String(clamped),
     }))
   }
 
   async function saveMarks() {
+    setMessage("")
+
     if (!selectedClass) {
-      setMessage('Please select a class.')
-      setMessageType('error')
+      setMessage("Please select a class.")
+      setMessageType("error")
       return
     }
 
     if (!selectedExam) {
-      setMessage('Please select an exam.')
-      setMessageType('error')
+      setMessage("Please select an exam.")
+      setMessageType("error")
+      return
+    }
+
+    if (!selectedSubject) {
+      setMessage("Please select a subject.")
+      setMessageType("error")
+      return
+    }
+
+    if (!isAdmin && !isTeacher) {
+      setMessage("You are not allowed to enter marks.")
+      setMessageType("error")
       return
     }
 
     if (classStudents.length === 0) {
-      setMessage('No students found in this class.')
-      setMessageType('error')
+      setMessage("There are no students in this class.")
+      setMessageType("error")
       return
     }
 
-    if (classSubjects.length === 0) {
-      setMessage(
-        'No subjects or learning areas found for this class.'
-      )
-      setMessageType('error')
-      return
-    }
+    const entries = classStudents.map((student) => {
+      const rawValue = scores[String(student.id)]
 
-    const entries: {
-      studentId: string
-      subjectId: string
-      score: number
-    }[] = []
+      const score =
+        rawValue === "" ||
+        rawValue === undefined
+          ? null
+          : Number(rawValue)
 
-    classStudents.forEach((student) => {
-      classSubjects.forEach((subject) => {
-        const value =
-          scores[
-            scoreKey(
-              String(student.id),
-              String(subject.id)
-            )
-          ]
-
-        if (
-          value !== undefined &&
-          value !== ''
-        ) {
-          const score = Number(value)
-
-          if (
-            !Number.isNaN(score) &&
-            score >= 0 &&
-            score <= 100
-          ) {
-            entries.push({
-              studentId: String(student.id),
-              subjectId: String(subject.id),
-              score,
-            })
-          }
-        }
-      })
+      return {
+        studentId: student.id,
+        subjectId: selectedSubject,
+        score,
+      }
     })
-
-    if (entries.length === 0) {
-      setMessage(
-        'Enter at least one mark before saving.'
-      )
-      setMessageType('error')
-      return
-    }
 
     try {
       setSaving(true)
 
-      setMessage(
-        `Saving ${entries.length} mark${
-          entries.length === 1 ? '' : 's'
-        }...`
-      )
-
-      setMessageType('info')
-
-      const response = await fetch('/api/marks', {
-        method: 'POST',
+      const response = await fetch("/api/marks", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           examId: selectedExam,
@@ -427,548 +495,326 @@ export default function MarksPage() {
 
       const result = await response.json()
 
-      if (!response.ok) {
+      if (!response.ok || !result.success) {
         throw new Error(
-          result.error ||
-            result.message ||
-            'Failed to save marks.'
+          result.message ||
+            result.error ||
+            "Failed to save marks"
         )
       }
 
       setMessage(
-        `✓ ${entries.length} mark${
-          entries.length === 1 ? '' : 's'
-        } saved successfully.`
+        `${selectedSubjectObject?.name ?? "Subject"} marks saved successfully.`
       )
 
-      setMessageType('success')
+      setMessageType("success")
 
       await loadData()
     } catch (error) {
-      console.error('Save marks error:', error)
+      console.error(error)
 
       setMessage(
         error instanceof Error
           ? error.message
-          : 'Failed to save marks.'
+          : "Failed to save marks"
       )
 
-      setMessageType('error')
+      setMessageType("error")
     } finally {
       setSaving(false)
     }
   }
 
   function downloadClassMarks() {
-    if (!selectedClass) {
-      setMessage('Please select a class first.')
-      setMessageType('error')
-      return
-    }
-
-    if (classStudents.length === 0) {
+    if (
+      !selectedClass ||
+      !selectedExam ||
+      !selectedSubject
+    ) {
       setMessage(
-        'There are no students in this class.'
+        "Select a class, exam and subject before downloading."
       )
-      setMessageType('error')
+      setMessageType("error")
       return
     }
 
-    if (classSubjects.length === 0) {
-      setMessage(
-        'There are no subjects or learning areas for this class.'
-      )
-      setMessageType('error')
-      return
-    }
-
-    const selectedExamObject = exams.find(
-      (exam) =>
-        String(exam.id) === String(selectedExam)
+    const subject = subjects.find(
+      (item) =>
+        String(item.id) === String(selectedSubject)
     )
 
-    const headers = [
-      'No.',
-      'Admission Number',
-      'Student Name',
-      'Stream',
-      ...classSubjects.map(
-        (subject) =>
-          `${subject.name} (${subject.code})`
-      ),
+    const exam = exams.find(
+      (item) =>
+        String(item.id) === String(selectedExam)
+    )
+
+    const rows = [
+      [
+        "Admission No.",
+        "Student Name",
+        "Class",
+        "Stream",
+        subject?.name ?? "Subject",
+        "Exam",
+      ],
+      ...classStudents.map((student) => {
+        const score =
+          scores[String(student.id)] ?? ""
+
+        return [
+          student.admissionNo ?? "",
+          getStudentName(student),
+          student.className ?? "",
+          student.stream ?? "",
+          score,
+          exam?.name ?? "",
+        ]
+      }),
     ]
 
-    const rows = classStudents.map(
-      (student, index) => {
-        return [
-          index + 1,
-          student.admissionNo,
-          `${student.firstName} ${student.lastName}`.trim(),
-          student.stream || '',
-          ...classSubjects.map((subject) => {
-            const value =
-              scores[
-                scoreKey(
-                  String(student.id),
-                  String(subject.id)
-                )
-              ]
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => {
+            const text = String(value ?? "")
 
-            return value ?? ''
-          }),
-        ]
-      }
-    )
+            return `"${text.replace(/"/g, '""')}"`
+          })
+          .join(",")
+      )
+      .join("\n")
 
-    function csvEscape(value: unknown) {
-      const text = String(value ?? '')
-      return `"${text.replace(/"/g, '""')}"`
-    }
-
-    const csv = [
-      headers.map(csvEscape).join(','),
-      ...rows.map((row) =>
-        row.map(csvEscape).join(',')
-      ),
-    ].join('\n')
-
-    const blob = new Blob(
-      ['\uFEFF' + csv],
-      {
-        type: 'text/csv;charset=utf-8;',
-      }
-    )
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    })
 
     const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
+
+    const link = document.createElement("a")
 
     link.href = url
 
-    const examName =
-      selectedExamObject?.name || 'Marks'
-
-    const safeClass = selectedClass.replace(
-      /[^a-z0-9]+/gi,
-      '_'
-    )
-
-    const safeExam = examName.replace(
-      /[^a-z0-9]+/gi,
-      '_'
-    )
-
     link.download =
-      `${safeClass}_${safeExam}_Marks_List.csv`
+      `${selectedClass}-${subject?.name ?? "marks"}-${exam?.name ?? "exam"}.csv`
+        .replace(/\s+/g, "-")
 
     document.body.appendChild(link)
+
     link.click()
-    document.body.removeChild(link)
+
+    link.remove()
 
     URL.revokeObjectURL(url)
-
-    setMessage(
-      `${selectedClass} marks list downloaded successfully.`
-    )
-
-    setMessageType('success')
   }
 
-  const selectedExamObject = exams.find(
-    (exam) =>
-      String(exam.id) === String(selectedExam)
-  )
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
 
-  const normalizedRole =
-    String(role ?? '').toLowerCase()
-
-  const canSaveMarks =
-    normalizedRole === 'admin' ||
-    normalizedRole === 'teacher'
+          <p className="text-sm text-muted-foreground">
+            Loading marks...
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Marks Entry"
-        description="Select a class and exam to enter marks by learning area."
-      />
+    <div className="space-y-6 p-4 md:p-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Marks Entry
+        </h1>
 
-      {loading ? (
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">
-              Loading students, subjects, exams and marks...
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Class Marks List
-              </CardTitle>
-            </CardHeader>
+        <p className="text-sm text-muted-foreground">
+          Select a class, exam and subject to enter marks.
+        </p>
+      </div>
 
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <label className="mb-2 block text-sm font-medium">
-                    Class
-                  </label>
+      {message && (
+        <div
+          className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${
+            messageType === "success"
+              ? "border-green-200 bg-green-50 text-green-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {messageType === "success" ? (
+            <CheckCircle className="h-4 w-4 shrink-0" />
+          ) : (
+            <XCircle className="h-4 w-4 shrink-0" />
+          )}
 
-                  <select
-                    value={selectedClass}
-                    onChange={(event) => {
-                      setSelectedClass(
-                        event.target.value
-                      )
+          <span>{message}</span>
+        </div>
+      )}
 
-                      setScores({})
-                      setMessage('')
-                      setMessageType('')
-                    }}
-                    className="w-full rounded-md border bg-background p-2"
-                  >
-                    <option value="">
-                      Select class
-                    </option>
+      <div className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-3">
 
-                    {classes.map((className) => (
-                      <option
-                        key={className}
-                        value={className}
-                      >
-                        {className}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="class"
+              className="text-sm font-medium"
+            >
+              Class
+            </label>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium">
-                    Exam
-                  </label>
+            <select
+              id="class"
+              value={selectedClass}
+              onChange={(event) =>
+                setSelectedClass(event.target.value)
+              }
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">
+                Select class
+              </option>
 
-                  <select
-                    value={selectedExam}
-                    onChange={(event) => {
-                      setSelectedExam(
-                        event.target.value
-                      )
+              {classes.map((className) => (
+                <option
+                  key={className}
+                  value={className}
+                >
+                  {className}
+                </option>
+              ))}
+            </select>
+          </div>
 
-                      setMessage('')
-                      setMessageType('')
-                    }}
-                    className="w-full rounded-md border bg-background p-2"
-                  >
-                    <option value="">
-                      Select exam
-                    </option>
+          <div className="space-y-2">
+            <label
+              htmlFor="exam"
+              className="text-sm font-medium"
+            >
+              Exam
+            </label>
 
-                    {exams.map((exam) => (
-                      <option
-                        key={exam.id}
-                        value={exam.id}
-                      >
-                        {exam.name} - {exam.term}{' '}
-                        {exam.year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <select
+              id="exam"
+              value={selectedExam}
+              onChange={(event) =>
+                setSelectedExam(event.target.value)
+              }
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">
+                Select exam
+              </option>
 
-                <div className="flex items-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={loadData}
-                    disabled={loading || saving}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Refresh
-                  </Button>
+              {exams.map((exam) => (
+                <option
+                  key={exam.id}
+                  value={exam.id}
+                >
+                  {exam.name}
+                  {exam.term
+                    ? ` — ${exam.term}`
+                    : ""}
+                  {exam.year
+                    ? ` ${exam.year}`
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </div>
 
-                  <Button
-                    variant="outline"
-                    onClick={
-                      downloadClassMarks
-                    }
-                    disabled={
-                      !selectedClass ||
-                      classStudents.length === 0
-                    }
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Class List
-                  </Button>
-                </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="subject"
+              className="text-sm font-medium"
+            >
+              Subject
+            </label>
+
+            <select
+              id="subject"
+              value={selectedSubject}
+              onChange={(event) =>
+                setSelectedSubject(event.target.value)
+              }
+              disabled={!selectedClass}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">
+                {!selectedClass
+                  ? "Select class first"
+                  : isTeacher &&
+                    availableSubjects.length === 0
+                  ? "No assigned subjects"
+                  : "Select subject"}
+              </option>
+
+              {availableSubjects.map((subject) => (
+                <option
+                  key={subject.id}
+                  value={subject.id}
+                >
+                  {subject.name}
+                  {subject.code
+                    ? ` (${subject.code})`
+                    : ""}
+                </option>
+              ))}
+            </select>
+
+            {isTeacher &&
+              selectedClass &&
+              availableSubjects.length === 0 && (
+                <p className="text-xs text-red-600">
+                  No subjects are assigned to your account
+                  for this class.
+                </p>
+              )}
+          </div>
+        </div>
+      </div>
+
+      {selectedClass &&
+        selectedExam &&
+        selectedSubject &&
+        selectedSubjectObject && (
+          <div className="space-y-4">
+
+            <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {selectedClass} —{" "}
+                  {selectedSubjectObject.name}
+                </h2>
+
+                <p className="text-sm text-muted-foreground">
+                  {classStudents.length} student
+                  {classStudents.length === 1
+                    ? ""
+                    : "s"}
+                </p>
               </div>
 
-              {selectedClass && (
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-md border bg-muted/30 p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Selected Class
-                    </p>
+              <div className="flex flex-wrap gap-2">
 
-                    <p className="font-semibold">
-                      {selectedClass}
-                    </p>
-                  </div>
+                <button
+                  type="button"
+                  onClick={downloadClassMarks}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md border px-4 text-sm font-medium hover:bg-muted"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </button>
 
-                  <div className="rounded-md border bg-muted/30 p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Students
-                    </p>
-
-                    <p className="font-semibold">
-                      {classStudents.length}
-                    </p>
-                  </div>
-
-                  <div className="rounded-md border bg-muted/30 p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Learning Areas
-                    </p>
-
-                    <p className="font-semibold">
-                      {classSubjects.length}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {selectedClass &&
-            selectedExam && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    {selectedClass} —{' '}
-                    {selectedExamObject?.name ||
-                      'Selected Exam'}
-                  </CardTitle>
-
-                  <p className="text-sm text-muted-foreground">
-                    Enter marks out of 100 for each
-                    learning area.
-                  </p>
-                </CardHeader>
-
-                <CardContent>
-                  {classStudents.length === 0 ? (
-                    <div className="rounded-md border p-8 text-center">
-                      <p className="font-medium">
-                        No students found.
-                      </p>
-
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        There are no active students
-                        registered in{' '}
-                        {selectedClass}.
-                      </p>
-                    </div>
-                  ) : classSubjects.length === 0 ? (
-                    <div className="rounded-md border p-8 text-center">
-                      <p className="font-medium">
-                        No learning areas found.
-                      </p>
-
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Add subjects for this class
-                        category before entering marks.
-                      </p>
-                    </div>
-                  ) : (
+                <button
+                  type="button"
+                  onClick={saveMarks}
+                  disabled={saving}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? (
                     <>
-                      <div className="overflow-x-auto rounded-md border">
-                        <table className="min-w-max w-full border-collapse text-sm">
-                          <thead>
-                            <tr className="border-b bg-muted/50">
-                              <th className="sticky left-0 z-20 min-w-12 border-r bg-muted/50 p-3 text-left">
-                                #
-                              </th>
-
-                              <th className="sticky left-12 z-20 min-w-36 border-r bg-muted/50 p-3 text-left">
-                                Admission No.
-                              </th>
-
-                              <th className="sticky left-[9rem] z-20 min-w-56 border-r bg-muted/50 p-3 text-left">
-                                Student Name
-                              </th>
-
-                              <th className="min-w-28 border-r p-3 text-left">
-                                Stream
-                              </th>
-
-                              {classSubjects.map(
-                                (subject) => (
-                                  <th
-                                    key={subject.id}
-                                    className="min-w-36 border-r p-3 text-center"
-                                  >
-                                    <div className="font-semibold">
-                                      {subject.name}
-                                    </div>
-
-                                    <div className="text-xs font-normal text-muted-foreground">
-                                      {subject.code}
-                                    </div>
-                                  </th>
-                                )
-                              )}
-                            </tr>
-                          </thead>
-
-                          <tbody>
-                            {classStudents.map(
-                              (
-                                student,
-                                index
-                              ) => (
-                                <tr
-                                  key={student.id}
-                                  className="border-b last:border-0"
-                                >
-                                  <td className="sticky left-0 z-10 border-r bg-background p-3">
-                                    {index + 1}
-                                  </td>
-
-                                  <td className="sticky left-12 z-10 border-r bg-background p-3 font-mono text-xs">
-                                    {student.admissionNo}
-                                  </td>
-
-                                  <td className="sticky left-[9rem] z-10 border-r bg-background p-3 font-medium">
-                                    {student.firstName}{' '}
-                                    {student.lastName}
-                                  </td>
-
-                                  <td className="border-r p-3 text-muted-foreground">
-                                    {student.stream ||
-                                      '—'}
-                                  </td>
-
-                                  {classSubjects.map(
-                                    (
-                                      subject
-                                    ) => {
-                                      const key =
-                                        scoreKey(
-                                          String(
-                                            student.id
-                                          ),
-                                          String(
-                                            subject.id
-                                          )
-                                        )
-
-                                      return (
-                                        <td
-                                          key={
-                                            subject.id
-                                          }
-                                          className="border-r p-2 text-center"
-                                        >
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={
-                                              scores[
-                                                key
-                                              ] ??
-                                              ''
-                                            }
-                                            onChange={(
-                                              event
-                                            ) =>
-                                              updateScore(
-                                                String(
-                                                  student.id
-                                                ),
-                                                String(
-                                                  subject.id
-                                                ),
-                                                event
-                                                  .target
-                                                  .value
-                                              )
-                                            }
-                                            className="h-9 w-24 rounded-md border bg-background px-2 text-center outline-none focus:ring-2 focus:ring-ring"
-                                            aria-label={`${subject.name} mark for ${student.firstName} ${student.lastName}`}
-                                          />
-                                        </td>
-                                      )
-                                    }
-                                  )}
-                                </tr>
-                              )
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                        {canSaveMarks && (
-                          <Button
-                            onClick={
-                              saveMarks
-                            }
-                            disabled={saving}
-                          >
-                            {saving
-                              ? 'Saving...'
-                              : 'Save All Marks'}
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          onClick={
-                            downloadClassMarks
-                          }
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Download{' '}
-                          {selectedClass}{' '}
-                          Class List
-                        </Button>
-
-                        {message && (
-                          <div
-                            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                              messageType ===
-                              'success'
-                                ? 'border-green-500/30 bg-green-500/10'
-                                : messageType ===
-                                    'error'
-                                  ? 'border-red-500/30 bg-red-500/10'
-                                  : 'bg-muted/30'
-                            }`}
-                          >
-                            {messageType ===
-                              'success' && (
-                              <CheckCircle className="h-4 w-4" />
-                            )}
-
-                            {messageType ===
-                              'error' && (
-                              <XCircle className="h-4 w-4" />
-                            )}
-
-                            <span>
-                              {message}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Saving...
                     </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-        </>
-      )}
-    </div>
-  )
-}
+                  ) 
