@@ -527,7 +527,7 @@ export default function MarksPage() {
       ),
     ].join('\n')
 
-    const blob = new Blob('
+    const blob = new Blob(
       ['\uFEFF' + csv],
       {
         type: 'text/csv;charset=utf-8;',
