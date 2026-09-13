@@ -795,3 +795,184 @@ export default function MarksPage() {
 
                               {classSubjects.map(
                                 (subject) => (
+                                    key={
+                                      subject.id
+                                    }
+                                    className="min-w-36 border-r p-3 text-center"
+                                  >
+                                    <div className="font-semibold">
+                                      {
+                                        subject.name
+                                      }
+                                    </div>
+
+                                    <div className="text-xs font-normal text-muted-foreground">
+                                      {
+                                        subject.code
+                                      }
+                                    </div>
+                                  </th>
+                                )
+                              )}
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {classStudents.map(
+                              (
+                                student,
+                                index
+                              ) => (
+                                <tr
+                                  key={student.id}
+                                  className="border-b last:border-0"
+                                >
+                                  <td className="sticky left-0 z-10 border-r bg-background p-3">
+                                    {index + 1}
+                                  </td>
+
+                                  <td className="sticky left-12 z-10 border-r bg-background p-3 font-mono text-xs">
+                                    {
+                                      student.admissionNo
+                                    }
+                                  </td>
+
+                                  <td className="sticky left-[9rem] z-10 border-r bg-background p-3 font-medium">
+                                    {
+                                      student.firstName
+                                    }{' '}
+                                    {
+                                      student.lastName
+                                    }
+                                  </td>
+
+                                  <td className="border-r p-3 text-muted-foreground">
+                                    {student.stream ||
+                                      '—'}
+                                  </td>
+
+                                  {classSubjects.map(
+                                    (
+                                      subject
+                                    ) => {
+                                      const key =
+                                        scoreKey(
+                                          String(
+                                            student.id
+                                          ),
+                                          String(
+                                            subject.id
+                                          )
+                                        )
+
+                                      return (
+                                        <td
+                                          key={
+                                            subject.id
+                                          }
+                                          className="border-r p-2 text-center"
+                                        >
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={
+                                              scores[
+                                                key
+                                              ] ??
+                                              ''
+                                            }
+                                            onChange={(
+                                              event
+                                            ) =>
+                                              updateScore(
+                                                String(
+                                                  student.id
+                                                ),
+                                                String(
+                                                  subject.id
+                                                ),
+                                                event
+                                                  .target
+                                                  .value
+                                              )
+                                            }
+                                            className="h-9 w-24 rounded-md border bg-background px-2 text-center outline-none focus:ring-2 focus:ring-ring"
+                                            aria-label={`${subject.name} mark for ${student.firstName} ${student.lastName}`}
+                                          />
+                                        </td>
+                                      )
+                                    }
+                                  )}
+                                </tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                        {canSaveMarks && (
+                          <Button
+                            onClick={
+                              saveMarks
+                            }
+                            disabled={saving}
+                          >
+                            {saving
+                              ? 'Saving...'
+                              : 'Save All Marks'}
+                          </Button>
+                        )}
+
+                        <Button
+                          variant="outline"
+                          onClick={
+                            downloadClassMarks
+                          }
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download{' '}
+                          {selectedClass}{' '}
+                          Class List
+                        </Button>
+
+                        {message && (
+                          <div
+                            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                              messageType ===
+                              'success'
+                                ? 'border-green-500/30 bg-green-500/10'
+                                : messageType ===
+                                    'error'
+                                  ? 'border-red-500/30 bg-red-500/10'
+                                  : 'bg-muted/30'
+                            }`}
+                          >
+                            {messageType ===
+                              'success' && (
+                              <CheckCircle className="h-4 w-4" />
+                            )}
+
+                            {messageType ===
+                              'error' && (
+                              <XCircle className="h-4 w-4" />
+                            )}
+
+                            <span>
+                              {message}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+        </>
+      )}
+    </div>  )
+                      }
+  )
+}
