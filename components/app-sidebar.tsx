@@ -298,6 +298,5 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </Sidebar>
       </SidebarFooter>
-    </Sidebar>
   )
       }
