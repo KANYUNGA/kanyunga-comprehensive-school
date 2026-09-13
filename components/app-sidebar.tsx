@@ -160,14 +160,23 @@ const NAV: NavGroup[] = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { data, logout, role } = useSchool()
+
+  const {
+    data,
+    logout,
+    role,
+    currentUser,
+  } = useSchool()
 
   function isActive(href: string) {
     if (href === '/dashboard') {
       return pathname === '/dashboard'
     }
 
-    return pathname === href || pathname.startsWith(href + '/')
+    return (
+      pathname === href ||
+      pathname.startsWith(href + '/')
+    )
   }
 
   const visibleGroups =
@@ -179,15 +188,27 @@ export function AppSidebar() {
             group.label !== 'Finance'
         )
 
+  /*
+   * Display the actual logged-in user's name.
+   *
+   * Examples:
+   * System Administrator
+   * MUTHOMI MUTHURI
+   * JOSHUA MAORE
+   * CHRISTINE KANYUA
+   */
   const displayName =
-    role === 'admin'
+    currentUser?.name?.trim() ||
+    (role === 'admin'
       ? 'System Administrator'
-      : 'User'
+      : 'User')
 
   const displayRole =
     role === 'admin'
       ? 'Admin'
-      : role
+      : role === 'teacher'
+        ? 'Teacher'
+        : 'Parent'
 
   return (
     <Sidebar>
@@ -228,7 +249,9 @@ export function AppSidebar() {
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      render={<Link href={item.href} />}
+                      render={
+                        <Link href={item.href} />
+                      }
                       isActive={isActive(item.href)}
                       tooltip={item.title}
                     >
@@ -274,7 +297,7 @@ export function AppSidebar() {
               <span>Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
-        </SidebarMenu>
+        </Sidebar>
       </SidebarFooter>
     </Sidebar>
   )
