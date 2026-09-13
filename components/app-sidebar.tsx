@@ -284,8 +284,7 @@ export function AppSidebar() {
                 </p>
               </div>
             </div>
-          </SidebarMenuItem>
-
+        
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => {
