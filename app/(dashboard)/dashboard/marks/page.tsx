@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -43,7 +42,7 @@ type Mark = {
 }
 
 export default function MarksPage() {
-  const { auth } = useSchool()
+  const { role } = useSchool()
 
   const [students, setStudents] = useState<Student[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
@@ -405,11 +404,13 @@ export default function MarksPage() {
 
     try {
       setSaving(true)
+
       setMessage(
         `Saving ${entries.length} mark${
           entries.length === 1 ? '' : 's'
         }...`
       )
+
       setMessageType('info')
 
       const response = await fetch('/api/marks', {
@@ -438,6 +439,7 @@ export default function MarksPage() {
           entries.length === 1 ? '' : 's'
         } saved successfully.`
       )
+
       setMessageType('success')
 
       await loadData()
@@ -449,6 +451,7 @@ export default function MarksPage() {
           ? error.message
           : 'Failed to save marks.'
       )
+
       setMessageType('error')
     } finally {
       setSaving(false)
@@ -565,6 +568,7 @@ export default function MarksPage() {
     setMessage(
       `${selectedClass} marks list downloaded successfully.`
     )
+
     setMessageType('success')
   }
 
@@ -573,11 +577,12 @@ export default function MarksPage() {
       String(exam.id) === String(selectedExam)
   )
 
-  const role = String(auth?.role ?? '').toLowerCase()
+  const normalizedRole =
+    String(role ?? '').toLowerCase()
 
   const canSaveMarks =
-    role === 'admin' ||
-    role === 'teacher'
+    normalizedRole === 'admin' ||
+    normalizedRole === 'teacher'
 
   return (
     <div className="flex flex-col gap-6">
@@ -616,6 +621,7 @@ export default function MarksPage() {
                       setSelectedClass(
                         event.target.value
                       )
+
                       setScores({})
                       setMessage('')
                       setMessageType('')
@@ -648,6 +654,7 @@ export default function MarksPage() {
                       setSelectedExam(
                         event.target.value
                       )
+
                       setMessage('')
                       setMessageType('')
                     }}
@@ -794,21 +801,17 @@ export default function MarksPage() {
                               </th>
 
                               {classSubjects.map(
-  (subject) => (
-    <th
-      key={subject.id}
-      className="min-w-36 border-r p-3 text-center"
-    >
+                      (subject) => (
+                                  <th
+                                    key={subject.id}
+                                    className="min-w-36 border-r p-3 text-center"
+                                  >
                                     <div className="font-semibold">
-                                      {
-                                        subject.name
-                                      }
+                                      {subject.name}
                                     </div>
 
                                     <div className="text-xs font-normal text-muted-foreground">
-                                      {
-                                        subject.code
-                                      }
+                                      {subject.code}
                                     </div>
                                   </th>
                                 )
@@ -831,18 +834,12 @@ export default function MarksPage() {
                                   </td>
 
                                   <td className="sticky left-12 z-10 border-r bg-background p-3 font-mono text-xs">
-                                    {
-                                      student.admissionNo
-                                    }
+                                    {student.admissionNo}
                                   </td>
 
                                   <td className="sticky left-[9rem] z-10 border-r bg-background p-3 font-medium">
-                                    {
-                                      student.firstName
-                                    }{' '}
-                                    {
-                                      student.lastName
-                                    }
+                                    {student.firstName}{' '}
+                                    {student.lastName}
                                   </td>
 
                                   <td className="border-r p-3 text-muted-foreground">
@@ -971,6 +968,6 @@ export default function MarksPage() {
             )}
         </>
       )}
-    </div> 
+    </div>
   )
 }
