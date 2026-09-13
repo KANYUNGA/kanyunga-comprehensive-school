@@ -188,15 +188,6 @@ export function AppSidebar() {
             group.label !== 'Finance'
         )
 
-  /*
-   * Display the actual logged-in user's name.
-   *
-   * Examples:
-   * System Administrator
-   * MUTHOMI MUTHURI
-   * JOSHUA MAORE
-   * CHRISTINE KANYUA
-   */
   const displayName =
     currentUser?.name?.trim() ||
     (role === 'admin'
@@ -284,7 +275,8 @@ export function AppSidebar() {
                 </p>
               </div>
             </div>
-        
+          </SidebarMenuItem>
+
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => {
@@ -298,5 +290,6 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+    </Sidebar>
   )
-      }
+}
