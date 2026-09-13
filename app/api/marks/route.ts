@@ -64,6 +64,127 @@ async function resolveStudentId(studentId: string) {
   return result[0]?.id ?? null
 }
 
+async function getTeacherIdForUser(userId: number) {
+  const result = await sql`
+    SELECT teacher_id
+    FROM users
+    WHERE id = ${userId}
+    LIMIT 1
+  `
+
+  return result[0]?.teacher_id ?? null
+}
+
+async function getStudentClass(studentId: number) {
+  const result = await sql`
+    SELECT
+      s.id,
+      s.class_name,
+      c.id AS class_id,
+      c.class_name AS database_class_name
+    FROM students s
+    LEFT JOIN classes c
+      ON LOWER(TRIM(c.class_name)) =
+         LOWER(TRIM(s.class_name))
+    WHERE s.id = ${studentId}
+    LIMIT 1
+  `
+
+  return result[0] ?? null
+}
+
+async function teacherCanEnterMarks(
+  teacherId: number,
+  studentId: number,
+  subjectId: number,
+) {
+  const student = await getStudentClass(studentId)
+
+  if (!student) {
+    return {
+      allowed: false,
+      reason: "Student record not found.",
+    }
+  }
+
+  if (!student.class_id) {
+    return {
+      allowed: false,
+      reason:
+        "The student's class is not linked to a class record.",
+    }
+  }
+
+  const className = String(
+    student.database_class_name ??
+      student.class_name ??
+      "",
+  )
+    .trim()
+    .toLowerCase()
+
+  /*
+   * Playgroup, PP1, PP2 and Grades 1–3:
+   * the class teacher teaches all subjects
+   * in their own class.
+   */
+  const earlyClasses = [
+    "playgroup",
+    "play group",
+    "pp1",
+    "preprimary 1",
+    "pp2",
+    "preprimary 2",
+    "grade 1",
+    "grade 2",
+    "grade 3",
+  ]
+
+  if (earlyClasses.includes(className)) {
+    const classTeacher = await sql`
+      SELECT id
+      FROM classes
+      WHERE id = ${student.class_id}
+        AND class_teacher = ${teacherId}
+      LIMIT 1
+    `
+
+    if (classTeacher.length > 0) {
+      return {
+        allowed: true,
+        reason: "Class teacher of own class.",
+      }
+    }
+  }
+
+  /*
+   * Grades 4–9 and any other classes:
+   * teacher must have an explicit
+   * teacher + subject + class assignment.
+   */
+  const assignment = await sql`
+    SELECT a.id
+    FROM teacher_subject_assignments a
+    WHERE a.teacher_id = ${teacherId}
+      AND a.subject_id = ${subjectId}
+      AND a.class_id = ${student.class_id}
+    LIMIT 1
+  `
+
+  if (assignment.length > 0) {
+    return {
+      allowed: true,
+      reason: "Assigned subject teacher.",
+    }
+  }
+
+  return {
+    allowed: false,
+    reason:
+      "You are not assigned to teach this subject in this class.",
+  }
+}
+
 export async function GET() {
   try {
     const marks = await sql`
@@ -112,13 +233,16 @@ export async function POST(
     if (!user) {
       return Response.json(
         {
-          error: "You must be logged in to enter marks.",
+          error:
+            "You must be logged in to enter marks.",
         },
         {
           status: 401,
         },
       )
     }
+
+    const userId = Number(user.id)
 
     const userRole = String(
       user.role ?? "",
@@ -127,8 +251,7 @@ export async function POST(
     const isAdmin =
       userRole === "admin"
 
-    let teacherSubject: string | null =
-      null
+    let teacherId: number | null = null
 
     if (!isAdmin) {
       if (userRole !== "teacher") {
@@ -143,7 +266,22 @@ export async function POST(
         )
       }
 
-      if (!user.teacher_id) {
+      if (!Number.isInteger(userId)) {
+        return Response.json(
+          {
+            error:
+              "Invalid user account.",
+          },
+          {
+            status: 403,
+          },
+        )
+      }
+
+      const linkedTeacherId =
+        await getTeacherIdForUser(userId)
+
+      if (!linkedTeacherId) {
         return Response.json(
           {
             error:
@@ -155,13 +293,14 @@ export async function POST(
         )
       }
 
+      teacherId = Number(
+        linkedTeacherId,
+      )
+
       const teacherResult = await sql`
-        SELECT
-          id,
-          subject,
-          status
+        SELECT id, status
         FROM teachers
-        WHERE id = ${Number(user.teacher_id)}
+        WHERE id = ${teacherId}
         LIMIT 1
       `
 
@@ -196,22 +335,6 @@ export async function POST(
           },
         )
       }
-
-      teacherSubject = String(
-        teacher.subject ?? "",
-      ).trim()
-
-      if (!teacherSubject) {
-        return Response.json(
-          {
-            error:
-              "No subject has been assigned to your teacher account.",
-          },
-          {
-            status: 403,
-          },
-        )
-      }
     }
 
     const body = await request.json()
@@ -229,7 +352,8 @@ export async function POST(
     if (!examId) {
       return Response.json(
         {
-          error: "Exam ID is required.",
+          error:
+            "Exam ID is required.",
         },
         {
           status: 400,
@@ -263,6 +387,17 @@ export async function POST(
         },
       )
     }
+
+    /*
+     * First validate every entry.
+     * Nothing is written until all permissions
+     * have been checked.
+     */
+    const validatedEntries: Array<{
+      studentId: number
+      subjectId: number
+      score: number
+    }> = []
 
     for (const entry of entries) {
       const studentId = String(
@@ -298,86 +433,44 @@ export async function POST(
       if (
         databaseStudentId === null
       ) {
-        console.warn(
-          `Student not found: ${studentId}`,
+        return Response.json(
+          {
+            error:
+              `Student not found: ${studentId}`,
+          },
+          {
+            status: 404,
+          },
         )
-        continue
       }
 
       if (
         databaseSubjectId === null
       ) {
-        console.warn(
-          `Subject not found: ${subjectId}`,
+        return Response.json(
+          {
+            error:
+              `Subject not found: ${subjectId}`,
+          },
+          {
+            status: 404,
+          },
         )
-        continue
       }
 
-      /*
-       * Teachers may only save marks
-       * for their assigned subject.
-       *
-       * Admins bypass this restriction.
-       */
       if (!isAdmin) {
-        const subjectResult =
-          await sql`
-            SELECT
-              id,
-              name,
-              legacy_id
-            FROM subjects
-            WHERE id = ${databaseSubjectId}
-            LIMIT 1
-          `
+        const permission =
+          await teacherCanEnterMarks(
+            teacherId as number,
+            databaseStudentId,
+            databaseSubjectId,
+          )
 
-        const subject =
-          subjectResult[0]
-
-        if (!subject) {
+        if (!permission.allowed) {
           return Response.json(
             {
               error:
-                "Subject not found.",
-            },
-            {
-              status: 404,
-            },
-          )
-        }
-
-        const assignedSubject =
-          String(
-            teacherSubject ?? "",
-          )
-            .trim()
-            .toLowerCase()
-
-        const databaseSubjectName =
-          String(
-            subject.name ?? "",
-          )
-            .trim()
-            .toLowerCase()
-
-        const databaseLegacyId =
-          String(
-            subject.legacy_id ?? "",
-          )
-            .trim()
-            .toLowerCase()
-
-        const allowed =
-          assignedSubject ===
-            databaseSubjectName ||
-          assignedSubject ===
-            databaseLegacyId
-
-        if (!allowed) {
-          return Response.json(
-            {
-              error:
-                "You can only enter marks for your assigned subject.",
+                permission.reason,
             },
             {
               status: 403,
@@ -391,19 +484,47 @@ export async function POST(
         Math.min(100, score),
       )
 
+      validatedEntries.push({
+        studentId:
+          databaseStudentId,
+        subjectId:
+          databaseSubjectId,
+        score: safeScore,
+      })
+    }
+
+    if (
+      validatedEntries.length === 0
+    ) {
+      return Response.json(
+        {
+          error:
+            "No valid marks were supplied.",
+        },
+        {
+          status: 400,
+        },
+      )
+    }
+
+    /*
+     * Save marks only after every entry
+     * has passed the permission check.
+     */
+    for (const entry of validatedEntries) {
       const existing = await sql`
         SELECT id
         FROM marks
-        WHERE student_id = ${databaseStudentId}
+        WHERE student_id = ${entry.studentId}
           AND exam_id = ${databaseExamId}
-          AND subject_id = ${databaseSubjectId}
+          AND subject_id = ${entry.subjectId}
         LIMIT 1
       `
 
       if (existing.length > 0) {
         await sql`
           UPDATE marks
-          SET marks = ${safeScore}
+          SET marks = ${entry.score}
           WHERE id = ${existing[0].id}
         `
       } else {
@@ -415,10 +536,10 @@ export async function POST(
             marks
           )
           VALUES (
-            ${databaseStudentId},
+            ${entry.studentId},
             ${databaseExamId},
-            ${databaseSubjectId},
-            ${safeScore}
+            ${entry.subjectId},
+            ${entry.score}
           )
         `
       }
@@ -429,7 +550,7 @@ export async function POST(
         success: true,
         message: isAdmin
           ? "Marks saved successfully."
-          : `Marks saved for ${teacherSubject}.`,
+          : "Marks saved successfully.",
       },
       {
         status: 200,
@@ -451,4 +572,4 @@ export async function POST(
       },
     )
   }
-      }
+}
