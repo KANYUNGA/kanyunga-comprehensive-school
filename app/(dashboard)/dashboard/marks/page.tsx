@@ -971,7 +971,6 @@ export default function MarksPage() {
             )}
         </>
       )}
-    </div>  )
-                      }
+    </div> 
   )
 }
