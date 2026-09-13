@@ -794,12 +794,11 @@ export default function MarksPage() {
                               </th>
 
                               {classSubjects.map(
-                                (subject) => (
-                                    key={
-                                      subject.id
-                                    }
-                                    className="min-w-36 border-r p-3 text-center"
-                                  >
+  (subject) => (
+    <th
+      key={subject.id}
+      className="min-w-36 border-r p-3 text-center"
+    >
                                     <div className="font-semibold">
                                       {
                                         subject.name
