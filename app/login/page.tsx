@@ -17,7 +17,7 @@ export default function LoginPage() {
   const router = useRouter()
   const { data, login } = useSchool()
   const [role, setRole] = useState<'admin' | 'teacher' | 'parent'>('admin')
-  const [email, setEmail] = useState('admin@kanyunga.school')
+  const [email, setEmail] = useState('admin@kanyunga.ac.ke')
   const [password, setPassword] = useState('password')
   const [studentId, setStudentId] = useState(data.students[0]?.id ?? '')
   const [error, setError] = useState('')
