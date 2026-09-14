@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useMemo, useState } from 'react'
@@ -74,6 +73,8 @@ export default function StudentsPage() {
   const [classFilter, setClassFilter] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Student | null>(null)
+
+  const isAdmin = auth?.role === 'admin'
 
   const filtered = useMemo(() => {
     const search = query.toLowerCase().trim()
@@ -155,20 +156,30 @@ export default function StudentsPage() {
   }
 
   function openRegisterDialog() {
+    if (!isAdmin) {
+      return
+    }
+
     setEditing(null)
     setDialogOpen(true)
   }
 
   function openEditDialog(student: Student) {
+    if (!isAdmin) {
+      return
+    }
+
     setEditing(student)
     setDialogOpen(true)
   }
 
   function handleDelete(student: Student) {
+    if (!isAdmin) {
+      return
+    }
+
     const confirmed = window.confirm(
-      'Are you sure you want to remove ' +
-        studentName(student) +
-        '?'
+      `Are you sure you want to remove ${studentName(student)}?`
     )
 
     if (!confirmed) {
@@ -194,7 +205,7 @@ export default function StudentsPage() {
               Download Class List
             </Button>
 
-            {auth?.role === 'admin' && (
+            {isAdmin && (
               <Button onClick={openRegisterDialog}>
                 <UserPlus className="h-4 w-4" />
                 Register Student
@@ -264,7 +275,7 @@ export default function StudentsPage() {
                 <TableHead>Guardian</TableHead>
                 <TableHead>Fee Balance</TableHead>
 
-                {auth?.role === 'admin' && (
+                {isAdmin && (
                   <TableHead className="w-10" />
                 )}
               </TableRow>
@@ -277,7 +288,10 @@ export default function StudentsPage() {
                 const studentWithPhoto =
                   student as StudentWithPhoto
 
-                const photoUrl = studentWithPhoto.photoUrl
+                const photoUrl =
+                  typeof studentWithPhoto.photoUrl === 'string'
+                    ? studentWithPhoto.photoUrl.trim()
+                    : ''
 
                 return (
                   <TableRow key={student.id}>
@@ -286,11 +300,14 @@ export default function StudentsPage() {
                         {photoUrl ? (
                           <img
                             src={photoUrl}
-                            alt={studentName(student)}
-                            className="h-10 w-10 shrink-0 rounded-full object-cover"
+                            alt={`${studentName(student)} passport photo`}
+                            className="h-12 w-12 shrink-0 rounded-full border object-cover"
                           />
                         ) : (
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                          <span
+                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border bg-primary/10 text-xs font-semibold text-primary"
+                            aria-label={`No passport photo for ${studentName(student)}`}
+                          >
                             {student.firstName?.[0] ?? ''}
                             {student.lastName?.[0] ?? ''}
                           </span>
@@ -356,7 +373,7 @@ export default function StudentsPage() {
                       )}
                     </TableCell>
 
-                    {auth?.role === 'admin' && (
+                    {isAdmin && (
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -402,14 +419,14 @@ export default function StudentsPage() {
               {filtered.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={auth?.role === 'admin' ? 7 : 6}
+                    colSpan={isAdmin ? 7 : 6}
                     className="py-12 text-center text-muted-foreground"
                   >
                     <Plus className="mx-auto mb-2 h-8 w-8 opacity-40" />
 
                     <p>
-                      No students found. Try adjusting your search or
-                      register a new student.
+                      No students found. Try adjusting your
+                      search or register a new student.
                     </p>
                   </TableCell>
                 </TableRow>
@@ -419,7 +436,7 @@ export default function StudentsPage() {
         </div>
       </Card>
 
-      {auth?.role === 'admin' && (
+      {isAdmin && (
         <StudentDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
