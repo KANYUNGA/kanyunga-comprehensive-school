@@ -552,7 +552,7 @@ export default function MarksPage() {
     studentId: string,
     subjectId: string
   ) {
-    return ${studentId}__${subjectId}
+    return `${studentId}__${subjectId}`
   }
 
   /*
