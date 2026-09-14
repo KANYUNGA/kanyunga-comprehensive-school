@@ -931,7 +931,7 @@ setMessageType("success")
       )
 
     link.download =
-      ${safeClass}_${safeSubject}_${safeExam}_Marks.csv
+      `${safeClass}_${safeSubject}_${safeExam}_Marks.csv`
 
     document.body.appendChild(link)
 
