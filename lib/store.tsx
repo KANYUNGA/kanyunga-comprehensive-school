@@ -283,10 +283,27 @@ export function SchoolProvider({
   children: ReactNode
 }) {
   const [data, setData] =
-    useState<SchoolData>(() =>
-      createSampleData()
-    )
-
+  useState<SchoolData>({
+    school: {
+      name: 'Kanyunga Comprehensive School',
+      motto: '',
+      address: '',
+      phone: '',
+      email: '',
+      logo: '',
+      currentTerm: '',
+      year: new Date().getFullYear(),
+    },
+    students: [],
+    teachers: [],
+    classes: [],
+    subjects: [],
+    exams: [],
+    marks: [],
+    attendance: [],
+    payments: [],
+    fees: [],
+  })
   const [role, setRole] =
     useState<Role>('admin')
 
