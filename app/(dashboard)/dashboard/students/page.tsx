@@ -67,7 +67,7 @@ type StudentWithPhoto = Student & {
 }
 
 export default function StudentsPage() {
-  const { data, deleteStudent, auth } = useSchool()
+ const { data, deleteStudent, role } = useSchool()
 
   const [query, setQuery] = useState('')
   const [classFilter, setClassFilter] = useState('all')
@@ -75,7 +75,7 @@ export default function StudentsPage() {
   const [editing, setEditing] = useState<Student | null>(null)
 
   const isAdmin =
-  String(auth?.role ?? '').trim().toLowerCase() === 'admin'
+  String(role ?? '').trim().toLowerCase() === 'admin'
   const filtered = useMemo(() => {
     const search = query.toLowerCase().trim()
 
