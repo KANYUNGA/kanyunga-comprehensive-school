@@ -174,7 +174,9 @@ export function StudentDialog({
           `KCS-${Math.floor(2000 + Math.random() * 8000)}`,
 
         firstName: draft.firstName.trim(),
+        middleName: draft.middleName?.trim() || '',
         lastName: draft.lastName.trim(),
+
         gender: draft.gender,
 
         classId: draft.classId,
@@ -186,7 +188,10 @@ export function StudentDialog({
 
         guardianName: draft.guardianName.trim(),
         guardianPhone: draft.guardianPhone.trim(),
+
         email: draft.email.trim(),
+
+        address: draft.address?.trim() || '',
 
         admissionDate: draft.admissionDate || null,
 
@@ -197,7 +202,7 @@ export function StudentDialog({
 
       const response = await fetch(
         student
-          ? `/api/students?id=${encodeURIComponent(student.id)}`
+          ? `/api/students/${encodeURIComponent(student.id)}`
           : '/api/students',
         {
           method: student ? 'PUT' : 'POST',
@@ -247,17 +252,18 @@ export function StudentDialog({
 
           <DialogDescription>
             {student
-              ? 'Update the student record below.'
-              : 'Enter the student details to enrol them.'}
+              ? 'Update the student details and passport photo.'
+              : 'Enter the student details and passport photo.'}
           </DialogDescription>
         </DialogHeader>
 
+        {/* PASSPORT PHOTO */}
         <div className="flex flex-col items-center gap-3 py-2">
           <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border bg-muted">
             {draft.photoUrl ? (
               <img
                 src={draft.photoUrl}
-                alt="Learner preview"
+                alt="Student passport photo"
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -273,29 +279,39 @@ export function StudentDialog({
               htmlFor="learner-photo"
               className="cursor-pointer rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
             >
-              📷 {draft.photoUrl ? 'Change Photo' : 'Upload Photo'}
+              📷 {draft.photoUrl ? 'Change Photo' : 'Upload Passport Photo'}
             </Label>
 
             <Input
               id="learner-photo"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/jpg"
               onChange={handlePhotoChange}
               className="hidden"
             />
 
             <p className="text-xs text-muted-foreground">
-              JPG, PNG or other image · Maximum 2 MB
+              JPG, PNG or WEBP · Maximum 2 MB
             </p>
           </div>
         </div>
 
+        {/* STUDENT DETAILS */}
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <Field label="First name">
             <Input
               value={draft.firstName}
               onChange={(e) =>
                 set('firstName', e.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Middle name">
+            <Input
+              value={draft.middleName || ''}
+              onChange={(e) =>
+                set('middleName', e.target.value)
               }
             />
           </Field>
@@ -436,6 +452,17 @@ export function StudentDialog({
           </Field>
 
           <div className="sm:col-span-2">
+            <Field label="Address">
+              <Input
+                value={draft.address || ''}
+                onChange={(e) =>
+                  set('address', e.target.value)
+                }
+              />
+            </Field>
+          </div>
+
+          <div className="sm:col-span-2">
             <Field label="Email">
               <Input
                 type="email"
@@ -495,4 +522,4 @@ function Field({
       {children}
     </div>
   )
-      }
+}
