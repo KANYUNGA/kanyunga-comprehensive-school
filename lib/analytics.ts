@@ -3,7 +3,12 @@ import { getGrade } from './grading'
 
 export function attendanceTrend(data: SchoolData) {
   const byDate = new Map<string, { present: number; total: number }>()
-  for (const a of data.studentAttendance) {
+
+  const attendance = Array.isArray(data.attendance)
+    ? data.attendance
+    : []
+
+  for (const a of attendance) {
     const entry = byDate.get(a.date) ?? { present: 0, total: 0 }
     entry.total += 1
     if (a.status === 'Present' || a.status === 'Late') entry.present += 1
