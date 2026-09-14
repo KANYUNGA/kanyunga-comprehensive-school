@@ -9,7 +9,7 @@ export function attendanceTrend(data: SchoolData) {
     if (a.status === 'Present' || a.status === 'Late') entry.present += 1
     byDate.set(a.date, entry)
   }
-  return [...byDate.entries(]
+  return [...byDate.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, v]) => ({
       date: new Date(date).toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric' }),
