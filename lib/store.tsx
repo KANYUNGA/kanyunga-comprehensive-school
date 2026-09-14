@@ -528,29 +528,113 @@ export function SchoolProvider({
                     )
                       .split(',')
                       .map(
-                        (
-                          s: string
-                        ) =>
-                          s.trim()
-                      )
-                      .filter(Boolean)
-                  : [],
-
-            classTeacherId:
-              cls.classTeacherId ??
-              (cls.class_teacher !=
-              null
-                ? String(
-                    cls.class_teacher
-                  )
-                : null),
+  const loadData = async () => {
+    try {
+      const fetchApi = async (
+        url: string,
+        property?: string
+      ): Promise<any[]> => {
+        try {
+          const response = await fetch(url, {
+            cache: 'no-store',
           })
-        )
+
+          if (!response.ok) {
+            console.error(
+              `${url} returned ${response.status}`
+            )
+            return []
+          }
+
+          const json = await response.json()
+          return getApiArray(json, property)
+        } catch (error) {
+          console.error(
+            `Failed to load ${url}:`,
+            error
+          )
+          return []
+        }
+      }
+
+      const studentsArray = await fetchApi(
+        '/api/students',
+        'students'
+      )
+
+      const teachersArray = await fetchApi(
+        '/api/teachers',
+        'teachers'
+      )
+
+      const classesArray = await fetchApi(
+        '/api/classes',
+        'classes'
+      )
+
+      const subjectsArray = await fetchApi(
+        '/api/subjects',
+        'subjects'
+      )
+
+      const examsArray = await fetchApi(
+        '/api/exams',
+        'exams'
+      )
+
+      const marksArray = await fetchApi(
+        '/api/marks',
+        'marks'
+      )
+
+      const attendanceArray = await fetchApi(
+        '/api/attendance',
+        'attendance'
+      )
+
+      const paymentsArray = await fetchApi(
+        '/api/payments',
+        'payments'
+      )
+
+      const feesArray = await fetchApi(
+        '/api/fees',
+        'fees'
+      )
+
+      const actualClasses =
+        classesArray.map((cls: any) => ({
+          ...cls,
+
+          id: String(cls.id),
+
+          name:
+            cls.name ??
+            cls.className ??
+            cls.class_name ??
+            '',
+
+          streams:
+            Array.isArray(cls.streams)
+              ? cls.streams
+              : cls.stream
+                ? String(cls.stream)
+                    .split(',')
+                    .map(
+                      (s: string) => s.trim()
+                    )
+                    .filter(Boolean)
+                : [],
+
+          classTeacherId:
+            cls.classTeacherId ??
+            (cls.class_teacher != null
+              ? String(cls.class_teacher)
+              : null),
+        }))
 
       const mappedStudents =
-        studentsArray.map(
-          mapStudent
-        )
+        studentsArray.map(mapStudent)
 
       const actualStudents =
         actualClasses.length > 0
@@ -561,43 +645,28 @@ export function SchoolProvider({
           : mappedStudents
 
       const actualTeachers =
-        teachersArray.map(
-          mapTeacher
-        )
+        teachersArray.map(mapTeacher)
 
-      /*
-       * Replace the current frontend
-       * data with the actual database data.
-       */
       setData((current) => ({
         ...current,
 
-        students:
-          actualStudents,
+        students: actualStudents,
 
-        teachers:
-          actualTeachers,
+        teachers: actualTeachers,
 
-        classes:
-          actualClasses,
+        classes: actualClasses,
 
-        subjects:
-          subjectsArray,
+        subjects: subjectsArray,
 
-        exams:
-          examsArray,
+        exams: examsArray,
 
-        marks:
-          marksArray,
+        marks: marksArray,
 
-        attendance:
-          attendanceArray,
+        attendance: attendanceArray,
 
-        payments:
-          paymentsArray,
+        payments: paymentsArray,
 
-        fees:
-          feesArray,
+        fees: feesArray,
       }))
 
       console.log(
