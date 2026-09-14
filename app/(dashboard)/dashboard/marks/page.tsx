@@ -1343,7 +1343,7 @@ setMessageType("success")
                                           )
                                         }
                                         className="h-9 w-24 rounded-md border bg-background px-2 text-center outline-none focus:ring-2 focus:ring-ring"
-                                        aria-label={${selectedSubjectObject?.name} mark for ${student.firstName} ${student.lastName}}
+                                        aria-label={`${selectedSubjectObject?.name} mark for ${student.firstName} ${student.lastName}`}
                                       />
                                     </td>
                                   </tr>
