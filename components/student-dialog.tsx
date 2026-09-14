@@ -154,10 +154,13 @@ export function StudentDialog({
   }
 
   async function handleSave() {
-    if (!draft.firstName.trim() || !draft.lastName.trim()) {
-      setError('First name and last name are required.')
-      return
-    }
+   if (
+  !String(draft.firstName ?? '').trim() ||
+  !String(draft.lastName ?? '').trim()
+) {
+  setError('First name and last name are required.')
+  return
+}
 
     if (!draft.classId) {
       setError('Please select a class.')
@@ -173,10 +176,9 @@ export function StudentDialog({
           draft.admissionNo ||
           `KCS-${Math.floor(2000 + Math.random() * 8000)}`,
 
-        firstName: draft.firstName.trim(),
-        middleName: draft.middleName?.trim() || '',
-        lastName: draft.lastName.trim(),
-
+  firstName: String(draft.firstName ?? '').trim(),
+middleName: String(draft.middleName ?? '').trim(),
+lastName: String(draft.lastName ?? '').trim(),
         gender: draft.gender,
 
         classId: draft.classId,
@@ -186,11 +188,9 @@ export function StudentDialog({
 
         dateOfBirth: draft.dateOfBirth || null,
 
-        guardianName: draft.guardianName.trim(),
-        guardianPhone: draft.guardianPhone.trim(),
-
-        email: draft.email.trim(),
-
+       guardianName: String(draft.guardianName ?? '').trim(),
+guardianPhone: String(draft.guardianPhone ?? '').trim(),
+email: String(draft.email ?? '').trim(),
         address: draft.address?.trim() || '',
 
         admissionDate: draft.admissionDate || null,
