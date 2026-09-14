@@ -74,8 +74,8 @@ export default function StudentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Student | null>(null)
 
-  const isAdmin = auth?.role === 'admin'
-
+  const isAdmin =
+  String(auth?.role ?? '').trim().toLowerCase() === 'admin'
   const filtered = useMemo(() => {
     const search = query.toLowerCase().trim()
 
