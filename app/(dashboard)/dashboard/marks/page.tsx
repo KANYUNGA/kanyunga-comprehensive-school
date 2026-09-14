@@ -321,8 +321,8 @@ export default function MarksPage() {
         return sameClass && active
       })
       .sort((a, b) =>
-       `${a.firstName} ${a.lastName}.localeCompare(
-          `${b.firstName} ${b.lastName}
+       `${a.firstName} ${a.lastName}`.localeCompare(
+          `${b.firstName} ${b.lastName}`
         )
       )
   }, [students, selectedClass])
