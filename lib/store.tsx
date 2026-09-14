@@ -355,349 +355,192 @@ export function SchoolProvider({
   const [loggedIn, setLoggedIn] =
     useState(false)
 
+  
   const loadData = async () => {
+    const fetchApi = async (
+      url: string,
+      property?: string
+    ): Promise<any[] | null> => {
+      try {
+        const response = await fetch(url, {
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          console.error(
+            `${url} returned HTTP ${response.status}`
+          )
+          return null
+        }
+
+        const json = await response.json()
+
+        return getApiArray(json, property)
+      } catch (error) {
+        console.error(
+          `Failed to load ${url}:`,
+          error
+        )
+        return null
+      }
+    }
+
     try {
       const [
-        studentsRes,
-        paymentsRes,
-        feesRes,
-        teachersRes,
-        classesRes,
-        subjectsRes,
-        examsRes,
-        marksRes,
-        attendanceRes,
+        studentsArray,
+        paymentsArray,
+        feesArray,
+        teachersArray,
+        classesArray,
+        subjectsArray,
+        examsArray,
+        marksArray,
+        attendanceArray,
       ] = await Promise.all([
-        fetch('/api/students', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/payments', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/fees', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/teachers', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/classes', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/subjects', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/exams', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/marks', {
-          cache: 'no-store',
-        }),
-
-        fetch('/api/attendance', {
-          cache: 'no-store',
-        }),
+        fetchApi('/api/students', 'students'),
+        fetchApi('/api/payments', 'payments'),
+        fetchApi('/api/fees', 'fees'),
+        fetchApi('/api/teachers', 'teachers'),
+        fetchApi('/api/classes', 'classes'),
+        fetchApi('/api/subjects', 'subjects'),
+        fetchApi('/api/exams', 'exams'),
+        fetchApi('/api/marks', 'marks'),
+        fetchApi('/api/attendance', 'attendance'),
       ])
 
-      const studentsJson =
-        studentsRes.ok
-          ? await studentsRes.json()
-          : []
-
-      const paymentsJson =
-        paymentsRes.ok
-          ? await paymentsRes.json()
-          : []
-
-      const feesJson =
-        feesRes.ok
-          ? await feesRes.json()
-          : []
-
-      const teachersJson =
-        teachersRes.ok
-          ? await teachersRes.json()
-          : []
-
-      const classesJson =
-        classesRes.ok
-          ? await classesRes.json()
-          : []
-
-      const subjectsJson =
-        subjectsRes.ok
-          ? await subjectsRes.json()
-          : []
-
-      const examsJson =
-        examsRes.ok
-          ? await examsRes.json()
-          : []
-
-      const marksJson =
-        marksRes.ok
-          ? await marksRes.json()
-          : []
-
-      const attendanceJson =
-        attendanceRes.ok
-          ? await attendanceRes.json()
-          : []
-
-      const studentsArray =
-        getApiArray(
-          studentsJson,
-          'students'
-        )
-
-      const teachersArray =
-        getApiArray(
-          teachersJson,
-          'teachers'
-        )
-
-      const classesArray =
-        getApiArray(
-          classesJson,
-          'classes'
-        )
-
-      const subjectsArray =
-        getApiArray(
-          subjectsJson,
-          'subjects'
-        )
-
-      const examsArray =
-        getApiArray(
-          examsJson,
-          'exams'
-        )
-
-      const marksArray =
-        getApiArray(
-          marksJson,
-          'marks'
-        )
-
-      const paymentsArray =
-        getApiArray(
-          paymentsJson,
-          'payments'
-        )
-
-      const feesArray =
-        getApiArray(
-          feesJson,
-          'fees'
-        )
-
-      const attendanceArray =
-        getApiArray(
-          attendanceJson,
-          'attendance'
-        )
-
       const actualClasses =
-        classesArray.map(
-          (cls: any) => ({
-            ...cls,
+        classesArray !== null
+          ? classesArray.map((cls: any) => ({
+              ...cls,
 
-            id: String(cls.id),
+              id: String(cls.id),
 
-            name:
-              cls.name ??
-              cls.className ??
-              cls.class_name ??
-              '',
+              name:
+                cls.name ??
+                cls.className ??
+                cls.class_name ??
+                '',
 
-            streams:
-              Array.isArray(
-                cls.streams
-              )
-                ? cls.streams
-                : cls.stream
-                  ? String(
-                      cls.stream
-                    )
-                      .split(',')
-                      .map(
-  const loadData = async () => {
-    try {
-      const fetchApi = async (
-        url: string,
-        property?: string
-      ): Promise<any[]> => {
-        try {
-          const response = await fetch(url, {
-            cache: 'no-store',
-          })
+              streams:
+                Array.isArray(cls.streams)
+                  ? cls.streams
+                  : cls.stream
+                    ? String(cls.stream)
+                        .split(',')
+                        .map(
+                          (s: string) => s.trim()
+                        )
+                        .filter(Boolean)
+                    : [],
 
-          if (!response.ok) {
-            console.error(
-              `${url} returned ${response.status}`
-            )
-            return []
-          }
-
-          const json = await response.json()
-          return getApiArray(json, property)
-        } catch (error) {
-          console.error(
-            `Failed to load ${url}:`,
-            error
-          )
-          return []
-        }
-      }
-
-      const studentsArray = await fetchApi(
-        '/api/students',
-        'students'
-      )
-
-      const teachersArray = await fetchApi(
-        '/api/teachers',
-        'teachers'
-      )
-
-      const classesArray = await fetchApi(
-        '/api/classes',
-        'classes'
-      )
-
-      const subjectsArray = await fetchApi(
-        '/api/subjects',
-        'subjects'
-      )
-
-      const examsArray = await fetchApi(
-        '/api/exams',
-        'exams'
-      )
-
-      const marksArray = await fetchApi(
-        '/api/marks',
-        'marks'
-      )
-
-      const attendanceArray = await fetchApi(
-        '/api/attendance',
-        'attendance'
-      )
-
-      const paymentsArray = await fetchApi(
-        '/api/payments',
-        'payments'
-      )
-
-      const feesArray = await fetchApi(
-        '/api/fees',
-        'fees'
-      )
-
-      const actualClasses =
-        classesArray.map((cls: any) => ({
-          ...cls,
-
-          id: String(cls.id),
-
-          name:
-            cls.name ??
-            cls.className ??
-            cls.class_name ??
-            '',
-
-          streams:
-            Array.isArray(cls.streams)
-              ? cls.streams
-              : cls.stream
-                ? String(cls.stream)
-                    .split(',')
-                    .map(
-                      (s: string) => s.trim()
-                    )
-                    .filter(Boolean)
-                : [],
-
-          classTeacherId:
-            cls.classTeacherId ??
-            (cls.class_teacher != null
-              ? String(cls.class_teacher)
-              : null),
-        }))
+              classTeacherId:
+                cls.classTeacherId ??
+                (cls.class_teacher != null
+                  ? String(cls.class_teacher)
+                  : null),
+            }))
+          : null
 
       const mappedStudents =
-        studentsArray.map(mapStudent)
+        studentsArray !== null
+          ? studentsArray.map(mapStudent)
+          : null
 
-      const actualStudents =
-        actualClasses.length > 0
-          ? connectStudentsToClasses(
-              mappedStudents,
-              actualClasses
-            )
-          : mappedStudents
+      const mappedTeachers =
+        teachersArray !== null
+          ? teachersArray.map(mapTeacher)
+          : null
 
-      const actualTeachers =
-        teachersArray.map(mapTeacher)
+      setData((current) => {
+        const classesToUse =
+          actualClasses ?? current.classes
 
-      setData((current) => ({
-        ...current,
+        const actualStudents =
+          mappedStudents !== null
+            ? classesToUse.length > 0
+              ? connectStudentsToClasses(
+                  mappedStudents,
+                  classesToUse
+                )
+              : mappedStudents
+            : current.students
 
-        students: actualStudents,
+        return {
+          ...current,
 
-        teachers: actualTeachers,
+          students: actualStudents,
 
-        classes: actualClasses,
+          teachers:
+            mappedTeachers !== null
+              ? mappedTeachers
+              : current.teachers,
 
-        subjects: subjectsArray,
+          classes:
+            actualClasses !== null
+              ? actualClasses
+              : current.classes,
 
-        exams: examsArray,
+          subjects:
+            subjectsArray !== null
+              ? subjectsArray
+              : current.subjects,
 
-        marks: marksArray,
+          exams:
+            examsArray !== null
+              ? examsArray
+              : current.exams,
 
-        attendance: attendanceArray,
+          marks:
+            marksArray !== null
+              ? marksArray
+              : current.marks,
 
-        payments: paymentsArray,
+          attendance:
+            attendanceArray !== null
+              ? attendanceArray
+              : current.attendance,
 
-        fees: feesArray,
-      }))
+          payments:
+            paymentsArray !== null
+              ? paymentsArray
+              : current.payments,
+
+          fees:
+            feesArray !== null
+              ? feesArray
+              : current.fees,
+        }
+      })
 
       console.log(
         'Database data loaded:',
         {
           students:
-            actualStudents.length,
+            studentsArray?.length ?? 'FAILED',
 
           teachers:
-            actualTeachers.length,
+            teachersArray?.length ?? 'FAILED',
 
           classes:
-            actualClasses.length,
+            classesArray?.length ?? 'FAILED',
 
           subjects:
-            subjectsArray.length,
+            subjectsArray?.length ?? 'FAILED',
 
           exams:
-            examsArray.length,
+            examsArray?.length ?? 'FAILED',
 
           marks:
-            marksArray.length,
+            marksArray?.length ?? 'FAILED',
 
           attendance:
-            attendanceArray.length,
+            attendanceArray?.length ?? 'FAILED',
 
           payments:
-            paymentsArray.length,
+            paymentsArray?.length ?? 'FAILED',
 
           fees:
-            feesArray.length,
+            feesArray?.length ?? 'FAILED',
         }
       )
     } catch (error) {
@@ -706,8 +549,7 @@ export function SchoolProvider({
         error
       )
     }
-  }
-
+      }
   useEffect(() => {
     loadData()
 
