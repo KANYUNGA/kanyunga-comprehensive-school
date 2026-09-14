@@ -231,57 +231,52 @@ function connectStudentsToClasses(
   classes: any[]
 ): StudentWithPhoto[] {
   return students.map((student) => {
-    const studentClassId = String(
-      student.classId ?? ''
+    const className = String(
+      student.className ||
+      student.classId ||
+      ''
     ).trim()
 
-    const studentClassName = String(
-      student.className ?? ''
-    ).trim()
-
-    const matchingClass = classes.find(
-      (cls: any) => {
-        const classId = String(
-          cls.id ?? ''
-        ).trim()
-
-        const className = String(
-          cls.name ??
-            cls.className ??
-            cls.class_name ??
-            ''
-        ).trim()
-
-        return (
-          classId === studentClassId ||
-          className.toLowerCase() ===
-            studentClassId.toLowerCase() ||
-          className.toLowerCase() ===
-            studentClassName.toLowerCase()
-        )
-      }
-    )
-
-    if (!matchingClass) {
+    if (!className) {
       return student
     }
 
+    const matchingClass = classes.find((cls: any) => {
+      const name = String(
+        cls.name ??
+        cls.className ??
+        cls.class_name ??
+        ''
+      ).trim()
+
+      return (
+        name.toLowerCase() ===
+        className.toLowerCase()
+      )
+    })
+
+    if (!matchingClass) {
+      return {
+        ...student,
+        classId: className,
+        className: className,
+      }
+    }
+
+    const matchedName = String(
+      matchingClass.name ??
+      matchingClass.className ??
+      matchingClass.class_name ??
+      className
+    ).trim()
+
     return {
       ...student,
-
-      classId:
-        String(matchingClass.id),
-
-      className:
-        matchingClass.name ??
-        matchingClass.className ??
-        matchingClass.class_name ??
-        student.className ??
-        '',
+      classId: matchedName,
+      className: matchedName,
     }
   })
 }
-
 export function SchoolProvider({
   children,
 }: {
