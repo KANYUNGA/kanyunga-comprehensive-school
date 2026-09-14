@@ -9,7 +9,7 @@ export function attendanceTrend(data: SchoolData) {
     if (a.status === 'Present' || a.status === 'Late') entry.present += 1
     byDate.set(a.date, entry)
   }
-  return [...byDate.entries()]
+  return [...byDate.entries()]export
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, v]) => ({
       date: new Date(date).toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric' }),
@@ -17,13 +17,45 @@ export function attendanceTrend(data: SchoolData) {
     }))
 }
 
-export function todayAttendanceRate(data: SchoolData) {
-  const dates = [...new Set(data.studentAttendance.map((a) => a.date))].sort()
+ export function todayAttendanceRate(data: SchoolData) {
+  const attendance = Array.isArray(data.attendance)
+    ? data.attendance
+    : []
+
+  if (!attendance.length) {
+    return 0
+  }
+
+  const dates = [
+    ...new Set(
+      attendance
+        .map((a) => a.date)
+        .filter(Boolean)
+    ),
+  ].sort()
+
   const latest = dates[dates.length - 1]
-  const records = data.studentAttendance.filter((a) => a.date === latest)
-  if (!records.length) return 0
-  const present = records.filter((a) => a.status === 'Present' || a.status === 'Late').length
-  return Math.round((present / records.length) * 100)
+
+  if (!latest) {
+    return 0
+  }
+
+  const records = attendance.filter(
+    (a) => a.date === latest
+  )
+
+  if (!records.length) {
+    return 0
+  }
+
+  const present = records.filter(
+    (a) =>
+      String(a.status).toLowerCase() === 'present'
+  ).length
+
+  return Math.round(
+    (present / records.length) * 100
+  )
 }
 
 export function classDistribution(data: SchoolData) {
