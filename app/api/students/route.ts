@@ -25,6 +25,7 @@ function mapStudent(s: any) {
       ? new Date(s.admission_date).toISOString().slice(0, 10)
       : "",
     status: s.status ?? "Active",
+    photoUrl: s.photo_url ?? "",
   }
 }
 
@@ -45,7 +46,8 @@ export async function GET() {
         parent_phone,
         address,
         admission_date,
-        status
+        status,
+        photo_url
       FROM students
       ORDER BY id ASC
     `
@@ -112,7 +114,8 @@ export async function POST(request: Request) {
         parent_phone,
         address,
         admission_date,
-        status
+        status,
+        photo_url
       )
       VALUES (
         ${student.admissionNo},
@@ -127,7 +130,8 @@ export async function POST(request: Request) {
         ${student.guardianPhone || ""},
         ${student.address || null},
         ${student.admissionDate || null},
-        ${student.status || "Active"}
+        ${student.status || "Active"},
+        ${student.photoUrl || null}
       )
       RETURNING
         id,
@@ -143,7 +147,8 @@ export async function POST(request: Request) {
         parent_phone,
         address,
         admission_date,
-        status
+        status,
+        photo_url
     `
 
     return Response.json(mapStudent(result[0]), { status: 201 })
@@ -161,4 +166,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-          }
+}
