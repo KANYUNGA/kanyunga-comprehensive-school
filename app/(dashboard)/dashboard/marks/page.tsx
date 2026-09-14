@@ -942,7 +942,7 @@ setMessageType("success")
     URL.revokeObjectURL(url)
 
     setMessage(
-      ${selectedClass} ${subjectName} marks downloaded successfully.
+     `${selectedClass} ${subjectName} marks downloaded successfully.`
     )
 
     setMessageType("success")
