@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   BookOpen,
   CalendarCheck,
+  CalendarDays,
   ClipboardList,
   CreditCard,
   FileText,
@@ -143,6 +144,11 @@ const NAV: NavGroup[] = [
   {
     label: 'System',
     items: [
+      {
+        title: 'School Calendar',
+        href: '/dashboard/academic-calendar',
+        icon: CalendarDays,
+      },
       {
         title: 'Users',
         href: '/dashboard/users',
@@ -288,7 +294,7 @@ export function AppSidebar() {
               <span>Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
-        </SidebarMenu>
+        </Sidebar>
       </SidebarFooter>
     </Sidebar>
   )
