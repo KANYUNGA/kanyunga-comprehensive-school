@@ -207,7 +207,7 @@ export function ReportCard({
     >
       {/* SCHOOL HEADER */}
       <div className="mb-5 border-b-2 pb-4 text-center">
-       <div className="mb-3 flex justify-center">
+      <div className="mb-3 flex justify-center">
   <img
     src="/school-logo.jpg"
     alt="Kanyunga Comprehensive School Logo"
