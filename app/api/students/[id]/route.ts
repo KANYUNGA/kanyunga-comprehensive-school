@@ -1,16 +1,48 @@
+
 import { getDb } from "@/lib/db"
 import { requireAdmin } from "@/lib/server-auth"
 
 const sql = getDb()
+
+function safeString(value: unknown): string {
+  if (value === null || value === undefined) return ""
+  return String(value)
+}
+
+function formatDate(value: unknown): string {
+  if (!value) return ""
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10)
+  }
+
+  return String(value).slice(0, 10)
+}
+
+async function ensurePhotoColumn() {
+  await sql`
+    ALTER TABLE students
+    ADD COLUMN IF NOT EXISTS photo_url TEXT
+  `
+}
+
+/* =========================================================
+   UPDATE STUDENT
+   ========================================================= */
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdmin()
-  if (!auth.authorized) return auth.response
+
+  if (!auth.authorized) {
+    return auth.response
+  }
 
   try {
+    await ensurePhotoColumn()
+
     const { id } = await params
     const student = await request.json()
 
@@ -18,28 +50,139 @@ export async function PUT(
 
     if (!Number.isInteger(studentId) || studentId <= 0) {
       return Response.json(
-        { error: "Invalid student ID" },
+        {
+          success: false,
+          error: "Invalid student ID",
+        },
         { status: 400 }
+      )
+    }
+
+    const admissionNo = safeString(
+      student.admissionNo
+    ).trim()
+
+    const firstName = safeString(
+      student.firstName
+    ).trim()
+
+    const middleName = safeString(
+      student.middleName
+    ).trim()
+
+    const lastName = safeString(
+      student.lastName
+    ).trim()
+
+    const gender = safeString(
+      student.gender
+    ).trim()
+
+    const className = safeString(
+      student.className ?? student.classId
+    ).trim()
+
+    const stream = safeString(
+      student.stream
+    ).trim()
+
+    const dateOfBirth = safeString(
+      student.dateOfBirth
+    ).trim()
+
+    const guardianName = safeString(
+      student.guardianName
+    ).trim()
+
+    const guardianPhone = safeString(
+      student.guardianPhone
+    ).trim()
+
+    const address = safeString(
+      student.address
+    ).trim()
+
+    const admissionDate = safeString(
+      student.admissionDate
+    ).trim()
+
+    const status =
+      safeString(student.status).trim() ||
+      "Active"
+
+    const photoUrl = safeString(
+      student.photoUrl
+    ).trim()
+
+    if (!admissionNo) {
+      return Response.json(
+        {
+          success: false,
+          error: "Admission number is required",
+        },
+        { status: 400 }
+      )
+    }
+
+    if (!firstName) {
+      return Response.json(
+        {
+          success: false,
+          error: "First name is required",
+        },
+        { status: 400 }
+      )
+    }
+
+    if (!lastName) {
+      return Response.json(
+        {
+          success: false,
+          error: "Last name is required",
+        },
+        { status: 400 }
+      )
+    }
+
+    /*
+     * Make sure the admission number is not already
+     * being used by another student.
+     */
+    const duplicate = await sql`
+      SELECT id
+      FROM students
+      WHERE admission_number = ${admissionNo}
+        AND id <> ${studentId}
+      LIMIT 1
+    `
+
+    if (duplicate.length > 0) {
+      return Response.json(
+        {
+          success: false,
+          error: `Admission number ${admissionNo} already exists`,
+        },
+        { status: 409 }
       )
     }
 
     const result = await sql`
       UPDATE students
       SET
-        admission_number = ${student.admissionNo},
-        first_name = ${student.firstName},
-        middle_name = ${student.middleName || null},
-        last_name = ${student.lastName},
-        gender = ${student.gender},
-        date_of_birth = ${student.dateOfBirth || null},
-        class_name = ${student.className || student.classId},
-        stream = ${student.stream},
-        parent_name = ${student.guardianName},
-        parent_phone = ${student.guardianPhone},
-        address = ${student.address || null},
-        admission_date = ${student.admissionDate || null},
-        status = ${student.status || "Active"},
-        photo_url = ${student.photoUrl || null}
+        admission_number = ${admissionNo},
+        first_name = ${firstName},
+        middle_name = ${middleName || null},
+        last_name = ${lastName},
+        gender = ${gender},
+        date_of_birth = ${dateOfBirth || null},
+        class_name = ${className},
+        stream = ${stream},
+        parent_name = ${guardianName},
+        parent_phone = ${guardianPhone},
+        address = ${address || null},
+        admission_date = ${admissionDate || null},
+        status = ${status},
+        photo_url = ${photoUrl || null}
       WHERE id = ${studentId}
       RETURNING
         id,
@@ -61,7 +204,10 @@ export async function PUT(
 
     if (result.length === 0) {
       return Response.json(
-        { error: "Student not found" },
+        {
+          success: false,
+          error: "Student not found",
+        },
         { status: 404 }
       )
     }
@@ -69,58 +215,100 @@ export async function PUT(
     const s = result[0]
 
     return Response.json({
-      id: String(s.id),
-      admissionNo: s.admission_number ?? "",
-      firstName: s.first_name ?? "",
-      middleName: s.middle_name ?? "",
-      lastName: s.last_name ?? "",
-      gender: s.gender ?? "Male",
-      classId: s.class_name ?? "",
-      className: s.class_name ?? "",
-      stream: s.stream ?? "",
-      dateOfBirth: s.date_of_birth
-        ? String(s.date_of_birth).slice(0, 10)
-        : "",
-      guardianName: s.parent_name ?? "",
-      guardianPhone: s.parent_phone ?? "",
-      address: s.address ?? "",
-      email: "",
-      admissionDate: s.admission_date
-        ? String(s.admission_date).slice(0, 10)
-        : "",
-      status: s.status ?? "Active",
-      photoUrl: s.photo_url ?? "",
+      success: true,
+      student: {
+        id: String(s.id),
+        admissionNo: safeString(
+          s.admission_number
+        ),
+        firstName: safeString(
+          s.first_name
+        ),
+        middleName: safeString(
+          s.middle_name
+        ),
+        lastName: safeString(
+          s.last_name
+        ),
+        gender:
+          safeString(s.gender) || "Male",
+        classId: safeString(
+          s.class_name
+        ),
+        className: safeString(
+          s.class_name
+        ),
+        stream: safeString(
+          s.stream
+        ),
+        dateOfBirth: formatDate(
+          s.date_of_birth
+        ),
+        guardianName: safeString(
+          s.parent_name
+        ),
+        guardianPhone: safeString(
+          s.parent_phone
+        ),
+        address: safeString(
+          s.address
+        ),
+        email: "",
+        admissionDate: formatDate(
+          s.admission_date
+        ),
+        status:
+          safeString(s.status) || "Active",
+        photoUrl: safeString(
+          s.photo_url
+        ),
+      },
     })
   } catch (error) {
-    console.error("Failed to update student:", error)
+    console.error(
+      "FAILED TO UPDATE STUDENT:",
+      error
+    )
 
     return Response.json(
       {
+        success: false,
         error: "Failed to update student",
         detail:
           error instanceof Error
             ? error.message
-            : "Unknown error",
+            : String(error),
       },
       { status: 500 }
     )
   }
 }
 
+/* =========================================================
+   DELETE STUDENT
+   ========================================================= */
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdmin()
-  if (!auth.authorized) return auth.response
+
+  if (!auth.authorized) {
+    return auth.response
+  }
 
   try {
     const { id } = await params
+
     const studentId = Number(id)
 
     if (!Number.isInteger(studentId) || studentId <= 0) {
       return Response.json(
-        { error: "Invalid student ID" },
+        {
+          success: false,
+          error: "Invalid student ID",
+        },
         { status: 400 }
       )
     }
@@ -133,17 +321,32 @@ export async function DELETE(
 
     if (result.length === 0) {
       return Response.json(
-        { error: "Student not found" },
+        {
+          success: false,
+          error: "Student not found",
+        },
         { status: 404 }
       )
     }
 
-    return Response.json({ success: true })
+    return Response.json({
+      success: true,
+    })
   } catch (error) {
-    console.error("Failed to delete student:", error)
+    console.error(
+      "FAILED TO DELETE STUDENT:",
+      error
+    )
 
     return Response.json(
-      { error: "Failed to delete student" },
+      {
+        success: false,
+        error: "Failed to delete student",
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
       { status: 500 }
     )
   }
