@@ -6,19 +6,14 @@ import {
   Search,
   Trash2,
   UserPlus,
-  Users,
   Upload,
+  Users,
 } from "lucide-react"
 
 import { PageHeader } from "@/components/page-header"
 import { StudentDialog } from "@/components/student-dialog"
 import { useSchool } from "@/lib/store"
-import {
-  formatKES,
-  feeForStudent,
-  studentName,
-  type Student,
-} from "@/lib/data"
+import type { Student } from "@/lib/data"
 
 const SCHOOL_CLASSES = [
   "Playgroup",
@@ -37,10 +32,10 @@ const SCHOOL_CLASSES = [
 
 type ApiStudent = {
   id: string
-  admissionNo: string
-  firstName: string
+  admissionNo?: string
+  firstName?: string
   middleName?: string
-  lastName: string
+  lastName?: string
   gender?: string
   classId?: string
   className?: string
@@ -55,11 +50,11 @@ type ApiStudent = {
   photoUrl?: string
 }
 
-type StudentWithPhoto = Student & {
+type DisplayStudent = Student & {
   photoUrl?: string
 }
 
-function safeString(value: unknown): string {
+function text(value: unknown): string {
   if (value === null || value === undefined) {
     return ""
   }
@@ -67,106 +62,162 @@ function safeString(value: unknown): string {
   return String(value)
 }
 
-function normalizeClassName(value: unknown): string {
-  const text = safeString(value)
-    .trim()
+function className(value: unknown): string {
+  const valueText = text(value).trim()
+
+  const normalized = valueText
     .toLowerCase()
     .replace(/\s+/g, "")
 
-  if (text === "playgroup" || text === "playgroup") {
+  if (normalized === "playgroup") {
     return "Playgroup"
   }
 
-  if (text === "preprimary1" || text === "pp1") {
+  if (normalized === "pp1") {
     return "PP1"
   }
 
-  if (text === "preprimary2" || text === "pp2") {
+  if (normalized === "pp2") {
     return "PP2"
   }
 
-  return safeString(value).trim()
+  return valueText
 }
 
-function mapApiStudent(student: ApiStudent): StudentWithPhoto {
-  const className = normalizeClassName(
+function fullName(student: DisplayStudent): string {
+  return [
+    text(student.firstName).trim(),
+    text(student.middleName).trim(),
+    text(student.lastName).trim(),
+  ]
+    .filter(Boolean)
+    .join(" ")
+}
+
+function mapStudent(student: ApiStudent): DisplayStudent {
+  const selectedClass = className(
     student.className ?? student.classId
   )
 
   return {
     id: String(student.id),
-    admissionNo: safeString(student.admissionNo),
-    firstName: safeString(student.firstName),
-    middleName: safeString(student.middleName),
-    lastName: safeString(student.lastName),
-    gender: safeString(student.gender),
-    classId: className,
-    stream: safeString(student.stream),
-    dateOfBirth: safeString(student.dateOfBirth),
-    guardianName: safeString(student.guardianName),
-    guardianPhone: safeString(student.guardianPhone),
-    address: safeString(student.address),
-    email: safeString(student.email),
-    admissionDate: safeString(student.admissionDate),
-    status: safeString(student.status) || "Active",
-    photoUrl: safeString(student.photoUrl),
+
+    admissionNo: text(student.admissionNo),
+
+    firstName: text(student.firstName),
+
+    middleName: text(student.middleName),
+
+    lastName: text(student.lastName),
+
+    gender: text(student.gender),
+
+    classId: selectedClass,
+
+    stream: text(student.stream),
+
+    dateOfBirth: text(student.dateOfBirth),
+
+    guardianName: text(student.guardianName),
+
+    guardianPhone: text(student.guardianPhone),
+
+    address: text(student.address),
+
+    email: text(student.email),
+
+    admissionDate: text(student.admissionDate),
+
+    status: text(student.status) || "Active",
+
+    photoUrl: text(student.photoUrl),
   }
 }
 
 export default function StudentsPage() {
   const { deleteStudent, role } = useSchool()
 
-  const [students, setStudents] = useState<StudentWithPhoto[]>([])
+  const [students, setStudents] = useState<
+    DisplayStudent[]
+  >([])
+
   const [loading, setLoading] = useState(true)
+
   const [error, setError] = useState("")
 
-  const [query, setQuery] = useState("")
-  const [classFilter, setClassFilter] = useState("all")
+  const [search, setSearch] = useState("")
 
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedClass, setSelectedClass] =
+    useState("all")
+
+  const [dialogOpen, setDialogOpen] =
+    useState(false)
+
   const [editingStudent, setEditingStudent] =
-    useState<StudentWithPhoto | null>(null)
+    useState<DisplayStudent | null>(null)
 
   const isAdmin =
-    safeString(role).trim().toLowerCase() === "admin"
+    text(role).trim().toLowerCase() === "admin"
 
   async function loadStudents() {
     try {
       setLoading(true)
       setError("")
 
-      const response = await fetch("/api/students", {
-        cache: "no-store",
-      })
+      const response = await fetch(
+        "/api/students",
+        {
+          cache: "no-store",
+        }
+      )
 
-      const json = await response.json()
+      const result = await response.json()
 
-      if (!response.ok || json.success === false) {
+      if (!response.ok) {
         throw new Error(
-          json.error || "Failed to load students"
+          result?.error ||
+            "Failed to load students"
         )
       }
 
-      const apiStudents = Array.isArray(json)
-        ? json
-        : Array.isArray(json.students)
-          ? json.students
+      if (result?.success === false) {
+        throw new Error(
+          result?.error ||
+            "Failed to load students"
+        )
+      }
+
+      const rawStudents = Array.isArray(
+        result?.students
+      )
+        ? result.students
+        : Array.isArray(result)
+          ? result
           : []
 
-      const mapped = apiStudents.map(
-        (student: ApiStudent) =>
-          mapApiStudent(student)
+      const convertedStudents =
+        rawStudents.map(
+          (student: ApiStudent) =>
+            mapStudent(student)
+        )
+
+      console.log(
+        "STUDENTS PAGE:",
+        convertedStudents.length
       )
 
-      setStudents(mapped)
-    } catch (err) {
-      console.error("Students page error:", err)
+      setStudents(convertedStudents)
+    } catch (error) {
+      console.error(
+        "STUDENTS PAGE LOAD ERROR:",
+        error
+      )
 
       setStudents([])
 
       setError(
-        err instanceof Error
-          ? err.message
+        error instanceof Error
+          ? error.message
           : "Students could not be loaded from the database."
       )
     } finally {
@@ -178,46 +229,74 @@ export default function StudentsPage() {
     loadStudents()
   }, [])
 
-  const filtered = useMemo(() => {
-    const search = query.trim().toLowerCase()
+  const filteredStudents = useMemo(() => {
+    const searchText =
+      search.trim().toLowerCase()
+
+    const selected =
+      className(selectedClass).toLowerCase()
 
     return students.filter((student) => {
-      const name = studentName(student).toLowerCase()
+      const name =
+        fullName(student).toLowerCase()
 
-      const admissionNo = safeString(
-        student.admissionNo
-      ).toLowerCase()
+      const admission =
+        text(student.admissionNo).toLowerCase()
 
-      const studentClass = normalizeClassName(
-        student.classId
-      ).toLowerCase()
-
-      const selectedClass =
-        normalizeClassName(classFilter).toLowerCase()
+      const studentClass =
+        className(student.classId).toLowerCase()
 
       const matchesSearch =
-        search === "" ||
-        name.includes(search) ||
-        admissionNo.includes(search)
+        searchText === "" ||
+        name.includes(searchText) ||
+        admission.includes(searchText)
 
       const matchesClass =
-        classFilter === "all" ||
-        studentClass === selectedClass
+        selectedClass === "all" ||
+        studentClass === selected
 
-      return matchesSearch && matchesClass
+      return (
+        matchesSearch &&
+        matchesClass
+      )
     })
-  }, [students, query, classFilter])
+  }, [
+    students,
+    search,
+    selectedClass,
+  ])
 
-  async function handleDelete(student: Student) {
+  function openAddDialog() {
     if (!isAdmin) {
       return
     }
 
-    const name = studentName(student)
+    setEditingStudent(null)
+    setDialogOpen(true)
+  }
 
-    const confirmed = window.confirm(
-      `Are you sure you want to remove ${name}?`
-    )
+  function openEditDialog(
+    student: DisplayStudent
+  ) {
+    if (!isAdmin) {
+      return
+    }
+
+    setEditingStudent(student)
+    setDialogOpen(true)
+  }
+
+  async function removeStudent(
+    student: DisplayStudent
+  ) {
+    if (!isAdmin) {
+      return
+    }
+
+    const confirmed =
+      window.confirm(
+        `Are you sure you want to remove ${fullName(student)}?`
+      )
 
     if (!confirmed) {
       return
@@ -228,43 +307,22 @@ export default function StudentsPage() {
 
       setStudents((current) =>
         current.filter(
-          (item) => String(item.id) !== String(student.id)
+          (item) =>
+            String(item.id) !==
+            String(student.id)
         )
       )
-    } catch (err) {
-      console.error("Failed to delete student:", err)
+    } catch (error) {
+      console.error(
+        "DELETE STUDENT ERROR:",
+        error
+      )
 
-      alert(
-        err instanceof Error
-          ? err.message
+      window.alert(
+        error instanceof Error
+          ? error.message
           : "Failed to remove student."
       )
-    }
-  }
-
-  function handleEdit(student: StudentWithPhoto) {
-    if (!isAdmin) {
-      return
-    }
-
-    setEditingStudent(student)
-    setDialogOpen(true)
-  }
-
-  function handleAdd() {
-    if (!isAdmin) {
-      return
-    }
-
-    setEditingStudent(null)
-    setDialogOpen(true)
-  }
-
-  function handleDialogChange(open: boolean) {
-    setDialogOpen(open)
-
-    if (!open) {
-      setEditingStudent(null)
     }
   }
 
@@ -278,7 +336,7 @@ export default function StudentsPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={handleAdd}
+              onClick={openAddDialog}
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               <UserPlus className="h-4 w-4" />
@@ -287,12 +345,12 @@ export default function StudentsPage() {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
-              onClick={() => {
-                alert(
-                  "Learner import will be added here."
+              onClick={() =>
+                window.alert(
+                  "Learner import will be enabled here."
                 )
-              }}
+              }
+              className="inline-flex items-center gap-2 rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
             >
               <Upload className="h-4 w-4" />
               Import Learners
@@ -302,26 +360,26 @@ export default function StudentsPage() {
       </PageHeader>
 
       {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-700">
           <div className="font-semibold">
             Unable to load students
           </div>
 
-          <div className="mt-1">
+          <div className="mt-1 text-sm">
             {error}
           </div>
 
           <button
             type="button"
             onClick={loadStudents}
-            className="mt-3 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+            className="mt-3 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
           >
             Try Again
           </button>
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-md bg-muted p-2">
@@ -329,35 +387,39 @@ export default function StudentsPage() {
             </div>
 
             <div>
-              <p className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground">
                 Total Students
-              </p>
+              </div>
 
-              <p className="text-2xl font-bold">
-                {loading ? "..." : students.length}
-              </p>
+              <div className="text-2xl font-bold">
+                {loading
+                  ? "..."
+                  : students.length}
+              </div>
             </div>
           </div>
         </div>
 
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground">
             Showing
-          </p>
+          </div>
 
-          <p className="text-2xl font-bold">
-            {loading ? "..." : filtered.length}
-          </p>
+          <div className="text-2xl font-bold">
+            {loading
+              ? "..."
+              : filteredStudents.length}
+          </div>
         </div>
 
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm text-muted-foreground">
-            Classes
-          </p>
+          <div className="text-sm text-muted-foreground">
+            School Classes
+          </div>
 
-          <p className="text-2xl font-bold">
+          <div className="text-2xl font-bold">
             {SCHOOL_CLASSES.length}
-          </p>
+          </div>
         </div>
       </div>
 
@@ -366,9 +428,10 @@ export default function StudentsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
           <input
-            value={query}
+            type="text"
+            value={search}
             onChange={(event) =>
-              setQuery(event.target.value)
+              setSearch(event.target.value)
             }
             placeholder="Search by student name or admission number..."
             className="w-full rounded-md border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -376,68 +439,78 @@ export default function StudentsPage() {
         </div>
 
         <select
-          value={classFilter}
+          value={selectedClass}
           onChange={(event) =>
-            setClassFilter(event.target.value)
+            setSelectedClass(
+              event.target.value
+            )
           }
           className="rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
         >
-          <option value="all">All Classes</option>
+          <option value="all">
+            All Classes
+          </option>
 
-          {SCHOOL_CLASSES.map((className) => (
-            <option
-              key={className}
-              value={className}
-            >
-              {className}
-            </option>
-          ))}
+          {SCHOOL_CLASSES.map(
+            (item) => (
+              <option
+                key={item}
+                value={item}
+              >
+                {item}
+              </option>
+            )
+          )}
         </select>
       </div>
 
       <div className="text-sm text-muted-foreground">
         Showing{" "}
-        <span className="font-semibold text-foreground">
-          {loading ? 0 : filtered.length}
-        </span>{" "}
+        <strong className="text-foreground">
+          {loading
+            ? 0
+            : filteredStudents.length}
+        </strong>{" "}
         of{" "}
-        <span className="font-semibold text-foreground">
-          {loading ? 0 : students.length}
-        </span>{" "}
+        <strong className="text-foreground">
+          {loading
+            ? 0
+            : students.length}
+        </strong>{" "}
         students
       </div>
 
       <div className="overflow-hidden rounded-lg border bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[900px]">
             <thead className="border-b bg-muted/50">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-4 py-3 text-left text-sm font-semibold">
                   Student
                 </th>
 
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-4 py-3 text-left text-sm font-semibold">
                   Adm. No
                 </th>
 
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-4 py-3 text-left text-sm font-semibold">
                   Class
                 </th>
 
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-4 py-3 text-left text-sm font-semibold">
                   Gender
                 </th>
 
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-4 py-3 text-left text-sm font-semibold">
                   Guardian
                 </th>
 
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-4 py-3 text-left text-sm font-semibold">
                   Fee Balance
                 </th>
 
                 {isAdmin && (
-                  <th className="px-4 py-3 text-right font-semibold">
+                  <th className="px-4 py-3 text-right text-sm font-semibold">
                     Actions
                   </th>
                 )}
@@ -448,43 +521,29 @@ export default function StudentsPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 7 : 6}
+                    colSpan={
+                      isAdmin ? 7 : 6
+                    }
                     className="px-4 py-12 text-center text-muted-foreground"
                   >
                     Loading students...
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : filteredStudents.length ===
+                0 ? (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 7 : 6}
+                    colSpan={
+                      isAdmin ? 7 : 6
+                    }
                     className="px-4 py-12 text-center text-muted-foreground"
                   >
-                    <div className="flex flex-col items-center gap-2">
-                      <Users className="h-10 w-10 opacity-40" />
-
-                      <p className="font-medium">
-                        No students found
-                      </p>
-
-                      <p className="text-xs">
-                        Try changing your search or class filter.
-                      </p>
-                    </div>
+                    No students found.
                   </td>
                 </tr>
               ) : (
-                filtered.map((student) => {
-                  const fee = feeForStudent(
-                    student.id
-                  )
-
-                  const balance =
-                    typeof fee?.balance === "number"
-                      ? fee.balance
-                      : 0
-
-                  return (
+                filteredStudents.map(
+                  (student) => (
                     <tr
                       key={student.id}
                       className="hover:bg-muted/30"
@@ -493,18 +552,22 @@ export default function StudentsPage() {
                         <div className="flex items-center gap-3">
                           {student.photoUrl ? (
                             <img
-                              src={student.photoUrl}
-                              alt={studentName(student)}
+                              src={
+                                student.photoUrl
+                              }
+                              alt={fullName(
+                                student
+                              )}
                               className="h-10 w-10 rounded-full border object-cover"
                             />
                           ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                              {safeString(
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-xs font-bold">
+                              {text(
                                 student.firstName
                               )
                                 .charAt(0)
                                 .toUpperCase()}
-                              {safeString(
+                              {text(
                                 student.lastName
                               )
                                 .charAt(0)
@@ -514,11 +577,15 @@ export default function StudentsPage() {
 
                           <div>
                             <div className="font-medium">
-                              {studentName(student)}
+                              {fullName(
+                                student
+                              ) || "Unnamed Student"}
                             </div>
 
                             <div className="text-xs text-muted-foreground">
-                              {student.status ||
+                              {text(
+                                student.status
+                              ) ||
                                 "Active"}
                             </div>
                           </div>
@@ -526,52 +593,49 @@ export default function StudentsPage() {
                       </td>
 
                       <td className="px-4 py-3 font-medium">
-                        {student.admissionNo || "—"}
+                        {text(
+                          student.admissionNo
+                        ) || "—"}
                       </td>
 
                       <td className="px-4 py-3">
-                        {normalizeClassName(
+                        {className(
                           student.classId
                         ) || "—"}
+
                         {student.stream && (
                           <span className="ml-1 text-xs text-muted-foreground">
-                            ({student.stream})
+                            (
+                            {student.stream}
+                            )
                           </span>
                         )}
                       </td>
 
                       <td className="px-4 py-3">
-                        {student.gender || "—"}
+                        {text(
+                          student.gender
+                        ) || "—"}
                       </td>
 
                       <td className="px-4 py-3">
-                        <div>
-                          {student.guardianName || "—"}
-                        </div>
+                        {text(
+                          student.guardianName
+                        ) || "—"}
 
                         {student.guardianPhone && (
                           <div className="text-xs text-muted-foreground">
-                            {student.guardianPhone}
+                            {
+                              student.guardianPhone
+                            }
                           </div>
                         )}
                       </td>
 
                       <td className="px-4 py-3">
-                        <span
-                          className={
-                            balance > 0
-                              ? "font-medium text-destructive"
-                              : "font-medium"
-                          }
-                        >
-                          {formatKES(balance)}
+                        <span className="font-medium">
+                          —
                         </span>
-
-                        {balance <= 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            Cleared
-                          </div>
-                        )}
                       </td>
 
                       {isAdmin && (
@@ -580,9 +644,11 @@ export default function StudentsPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                handleEdit(student)
+                                openEditDialog(
+                                  student
+                                )
                               }
-                              className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
+                              className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
                             >
                               <Edit className="h-3.5 w-3.5" />
                               Edit
@@ -591,9 +657,11 @@ export default function StudentsPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                handleDelete(student)
+                                removeStudent(
+                                  student
+                                )
                               }
-                              className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+                              className="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Remove
@@ -603,7 +671,7 @@ export default function StudentsPage() {
                       )}
                     </tr>
                   )
-                })
+                )
               )}
             </tbody>
           </table>
@@ -613,7 +681,7 @@ export default function StudentsPage() {
       {isAdmin && (
         <StudentDialog
           open={dialogOpen}
-          onOpenChange={handleDialogChange}
+          onOpenChange={setDialogOpen}
           student={editingStudent}
         />
       )}
