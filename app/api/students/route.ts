@@ -1,15 +1,16 @@
 
-import { getDb } from '@/lib/db'
-import { requireAdmin } from '@/lib/server-auth'
+import { getDb } from "@/lib/db"
+import { requireAdmin } from "@/lib/server-auth"
 
 const sql = getDb()
 
-function clean(value: unknown): string {
-  return value == null ? '' : String(value)
+function safeString(value: unknown): string {
+  if (value === null || value === undefined) return ""
+  return String(value)
 }
 
-function dateOnly(value: unknown): string {
-  if (!value) return ''
+function formatDate(value: unknown): string {
+  if (!value) return ""
 
   if (value instanceof Date) {
     return value.toISOString().slice(0, 10)
@@ -17,37 +18,63 @@ function dateOnly(value: unknown): string {
 
   const text = String(value)
 
-  if (text.includes('T')) {
+  if (text.length >= 10) {
     return text.slice(0, 10)
   }
 
-  return text.slice(0, 10)
+  return text
 }
 
-function mapStudent(row: any) {
+function mapStudent(student: any) {
   return {
-    id: String(row.id),
-    admissionNo: clean(row.admission_number),
-    firstName: clean(row.first_name),
-    middleName: clean(row.middle_name),
-    lastName: clean(row.last_name),
-    gender: clean(row.gender),
-    classId: clean(row.class_name),
-    className: clean(row.class_name),
-    stream: clean(row.stream),
-    dateOfBirth: dateOnly(row.date_of_birth),
-    guardianName: clean(row.parent_name),
-    guardianPhone: clean(row.parent_phone),
-    address: clean(row.address),
-    email: clean(row.email),
-    admissionDate: dateOnly(row.admission_date),
-    status: clean(row.status) || 'Active',
-    photoUrl: clean(row.photo_url),
+    id: String(student.id),
+
+    admissionNo: safeString(student.admission_number),
+
+    firstName: safeString(student.first_name),
+
+    middleName: safeString(student.middle_name),
+
+    lastName: safeString(student.last_name),
+
+    gender: safeString(student.gender),
+
+    classId: safeString(student.class_name),
+
+    className: safeString(student.class_name),
+
+    stream: safeString(student.stream),
+
+    dateOfBirth: formatDate(student.date_of_birth),
+
+    guardianName: safeString(student.parent_name),
+
+    guardianPhone: safeString(student.parent_phone),
+
+    address: safeString(student.address),
+
+    email: safeString(student.email),
+
+    admissionDate: formatDate(student.admission_date),
+
+    status: safeString(student.status) || "Active",
+
+    photoUrl: safeString(student.photo_url),
   }
 }
 
+/* =========================================================
+   GET ALL STUDENTS
+   ========================================================= */
+
 export async function GET() {
   try {
+    /*
+     * Keep this query compatible with the existing students table.
+     *
+     * We intentionally do NOT select email or photo_url here
+     * until we know those columns definitely exist in Neon.
+     */
     const students = await sql`
       SELECT
         id,
@@ -62,40 +89,54 @@ export async function GET() {
         parent_name,
         parent_phone,
         address,
-        email,
         admission_date,
         status,
-        photo_url,
         created_at
       FROM students
       ORDER BY
-        class_name ASC,
         first_name ASC,
         last_name ASC,
         id ASC
     `
 
-    return Response.json(
-      students.map(mapStudent),
-      {
-        status: 200,
-        headers: {
-          'Cache-Control': 'no-store',
-        },
-      }
-    )
+    /*
+     * Return the same structure expected by the frontend.
+     */
+    const mappedStudents = students.map((student: any) => ({
+      ...mapStudent(student),
+
+      /*
+       * These fields are supplied safely even when the database
+       * does not currently have corresponding columns.
+       */
+      email: "",
+      photoUrl: "",
+    }))
+
+    return Response.json({
+      success: true,
+      count: mappedStudents.length,
+      students: mappedStudents,
+    })
   } catch (error) {
-    console.error('GET /api/students failed:', error)
+    console.error("FAILED TO LOAD STUDENTS:", error)
 
     return Response.json(
       {
         success: false,
-        error: 'Failed to load students',
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       { status: 500 }
     )
   }
 }
+
+/* =========================================================
+   CREATE STUDENT
+   ========================================================= */
 
 export async function POST(request: Request) {
   const auth = await requireAdmin()
@@ -107,102 +148,60 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    const admissionNo = clean(
-      body.admissionNo ??
-        body.admission_number
+    const admissionNo = safeString(body.admissionNo).trim()
+    const firstName = safeString(body.firstName).trim()
+    const middleName = safeString(body.middleName).trim()
+    const lastName = safeString(body.lastName).trim()
+    const gender = safeString(body.gender).trim()
+    const className = safeString(
+      body.className ?? body.classId
     ).trim()
-
-    const firstName = clean(
-      body.firstName ??
-        body.first_name
+    const stream = safeString(body.stream).trim()
+    const dateOfBirth = safeString(body.dateOfBirth).trim()
+    const guardianName = safeString(body.guardianName).trim()
+    const guardianPhone = safeString(body.guardianPhone).trim()
+    const address = safeString(body.address).trim()
+    const admissionDate = safeString(
+      body.admissionDate
     ).trim()
-
-    const middleName = clean(
-      body.middleName ??
-        body.middle_name
-    ).trim()
-
-    const lastName = clean(
-      body.lastName ??
-        body.last_name
-    ).trim()
-
-    const gender = clean(body.gender).trim()
-
-    const className = clean(
-      body.classId ??
-        body.className ??
-        body.class_name
-    ).trim()
-
-    const stream = clean(body.stream).trim()
-
-    const dateOfBirth = clean(
-      body.dateOfBirth ??
-        body.date_of_birth
-    ).trim()
-
-    const guardianName = clean(
-      body.guardianName ??
-        body.guardian_name ??
-        body.parentName ??
-        body.parent_name
-    ).trim()
-
-    const guardianPhone = clean(
-      body.guardianPhone ??
-        body.guardian_phone ??
-        body.parentPhone ??
-        body.parent_phone
-    ).trim()
-
-    const address = clean(body.address).trim()
-
-    const email = clean(body.email).trim()
-
-    const admissionDate =
-      clean(
-        body.admissionDate ??
-          body.admission_date
-      ).trim() ||
-      new Date().toISOString().slice(0, 10)
-
     const status =
-      clean(body.status).trim() || 'Active'
+      safeString(body.status).trim() || "Active"
 
-    const photoUrl = clean(
-      body.photoUrl ??
-        body.photo_url
-    ).trim()
+    const photoUrl = safeString(body.photoUrl).trim()
 
     if (!admissionNo) {
       return Response.json(
-        { error: 'Admission number is required' },
+        {
+          success: false,
+          error: "Admission number is required",
+        },
         { status: 400 }
       )
     }
 
     if (!firstName) {
       return Response.json(
-        { error: 'First name is required' },
+        {
+          success: false,
+          error: "First name is required",
+        },
         { status: 400 }
       )
     }
 
     if (!lastName) {
       return Response.json(
-        { error: 'Last name is required' },
+        {
+          success: false,
+          error: "Last name is required",
+        },
         { status: 400 }
       )
     }
 
-    if (!className) {
-      return Response.json(
-        { error: 'Class is required' },
-        { status: 400 }
-      )
-    }
-
+    /*
+     * Check duplicate admission number.
+     */
     const existing = await sql`
       SELECT id
       FROM students
@@ -213,14 +212,21 @@ export async function POST(request: Request) {
     if (existing.length > 0) {
       return Response.json(
         {
-          error:
-            'A student with this admission number already exists',
+          success: false,
+          error: `Admission number ${admissionNo} already exists`,
         },
         { status: 409 }
       )
     }
 
-    const inserted = await sql`
+    /*
+     * Insert using the known existing columns.
+     *
+     * Photo is intentionally not inserted here because the
+     * database schema has not yet been confirmed to contain
+     * photo_url.
+     */
+    const result = await sql`
       INSERT INTO students (
         admission_number,
         first_name,
@@ -233,10 +239,8 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
-        email,
         admission_date,
-        status,
-        photo_url
+        status
       )
       VALUES (
         ${admissionNo},
@@ -250,10 +254,8 @@ export async function POST(request: Request) {
         ${guardianName},
         ${guardianPhone},
         ${address},
-        ${email},
         ${admissionDate || null},
-        ${status},
-        ${photoUrl}
+        ${status}
       )
       RETURNING
         id,
@@ -268,24 +270,39 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
-        email,
         admission_date,
         status,
-        photo_url,
         created_at
     `
 
+    const student = result[0]
+
     return Response.json(
-      mapStudent(inserted[0]),
+      {
+        success: true,
+        student: {
+          ...mapStudent(student),
+
+          /*
+           * Preserve the photo in the response if the frontend
+           * supplied one. It will not be permanently stored until
+           * we confirm the database photo column/storage setup.
+           */
+          photoUrl,
+        },
+      },
       { status: 201 }
     )
   } catch (error) {
-    console.error('POST /api/students failed:', error)
+    console.error("FAILED TO CREATE STUDENT:", error)
 
     return Response.json(
       {
         success: false,
-        error: 'Failed to create student',
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       { status: 500 }
     )
