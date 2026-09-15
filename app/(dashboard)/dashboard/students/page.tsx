@@ -1,196 +1,173 @@
+"use client"
 
-'use client'
-
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from "react"
 import {
-  Download,
-  MoreHorizontal,
-  Pencil,
-  Plus,
+  Edit,
   Search,
   Trash2,
   UserPlus,
-} from 'lucide-react'
+  Users,
+  Upload,
+} from "lucide-react"
 
-import { PageHeader } from '@/components/page-header'
-import { StudentDialog } from '@/components/student-dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-
-import { useSchool } from '@/lib/store'
+import { PageHeader } from "@/components/page-header"
+import { StudentDialog } from "@/components/student-dialog"
+import { useSchool } from "@/lib/store"
 import {
   formatKES,
   feeForStudent,
+  studentName,
   type Student,
-} from '@/lib/data'
+} from "@/lib/data"
 
 const SCHOOL_CLASSES = [
-  'Playgroup',
-  'PP1',
-  'PP2',
-  'Grade 1',
-  'Grade 2',
-  'Grade 3',
-  'Grade 4',
-  'Grade 5',
-  'Grade 6',
-  'Grade 7',
-  'Grade 8',
-  'Grade 9',
+  "Playgroup",
+  "PP1",
+  "PP2",
+  "Grade 1",
+  "Grade 2",
+  "Grade 3",
+  "Grade 4",
+  "Grade 5",
+  "Grade 6",
+  "Grade 7",
+  "Grade 8",
+  "Grade 9",
 ]
+
+type ApiStudent = {
+  id: string
+  admissionNo: string
+  firstName: string
+  middleName?: string
+  lastName: string
+  gender?: string
+  classId?: string
+  className?: string
+  stream?: string
+  dateOfBirth?: string
+  guardianName?: string
+  guardianPhone?: string
+  address?: string
+  email?: string
+  admissionDate?: string
+  status?: string
+  photoUrl?: string
+}
 
 type StudentWithPhoto = Student & {
   photoUrl?: string
 }
 
-function safe(value: unknown): string {
-  return value == null ? '' : String(value)
+function safeString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return ""
+  }
+
+  return String(value)
 }
 
-function displayStudentName(student: StudentWithPhoto): string {
-  return [
-    safe(student.firstName),
-    safe(student.middleName),
-    safe(student.lastName),
-  ]
-    .filter(Boolean)
-    .join(' ') || 'Unnamed Student'
+function normalizeClassName(value: unknown): string {
+  const text = safeString(value)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+
+  if (text === "playgroup" || text === "playgroup") {
+    return "Playgroup"
+  }
+
+  if (text === "preprimary1" || text === "pp1") {
+    return "PP1"
+  }
+
+  if (text === "preprimary2" || text === "pp2") {
+    return "PP2"
+  }
+
+  return safeString(value).trim()
 }
 
-function normalizeStudent(value: any): StudentWithPhoto {
+function mapApiStudent(student: ApiStudent): StudentWithPhoto {
+  const className = normalizeClassName(
+    student.className ?? student.classId
+  )
+
   return {
-    id: safe(value?.id),
-    admissionNo: safe(
-      value?.admissionNo ??
-        value?.admission_number ??
-        value?.admissionNumber
-    ),
-    firstName: safe(
-      value?.firstName ?? value?.first_name
-    ),
-    middleName: safe(
-      value?.middleName ?? value?.middle_name
-    ),
-    lastName: safe(
-      value?.lastName ?? value?.last_name
-    ),
-    gender: safe(value?.gender),
-    classId: safe(
-      value?.classId ??
-        value?.className ??
-        value?.class_name
-    ),
-    stream: safe(value?.stream),
-    dateOfBirth: safe(
-      value?.dateOfBirth ??
-        value?.date_of_birth
-    ),
-    guardianName: safe(
-      value?.guardianName ??
-        value?.guardian_name ??
-        value?.parentName ??
-        value?.parent_name
-    ),
-    guardianPhone: safe(
-      value?.guardianPhone ??
-        value?.guardian_phone ??
-        value?.parentPhone ??
-        value?.parent_phone
-    ),
-    address: safe(value?.address),
-    email: safe(value?.email),
-    admissionDate: safe(
-      value?.admissionDate ??
-        value?.admission_date
-    ),
-    status: safe(value?.status) || 'Active',
-    photoUrl: safe(
-      value?.photoUrl ??
-        value?.photo_url ??
-        value?.photo
-    ),
+    id: String(student.id),
+    admissionNo: safeString(student.admissionNo),
+    firstName: safeString(student.firstName),
+    middleName: safeString(student.middleName),
+    lastName: safeString(student.lastName),
+    gender: safeString(student.gender),
+    classId: className,
+    stream: safeString(student.stream),
+    dateOfBirth: safeString(student.dateOfBirth),
+    guardianName: safeString(student.guardianName),
+    guardianPhone: safeString(student.guardianPhone),
+    address: safeString(student.address),
+    email: safeString(student.email),
+    admissionDate: safeString(student.admissionDate),
+    status: safeString(student.status) || "Active",
+    photoUrl: safeString(student.photoUrl),
   }
-}
-
-function extractStudents(json: any): any[] {
-  if (Array.isArray(json)) {
-    return json
-  }
-
-  if (Array.isArray(json?.students)) {
-    return json.students
-  }
-
-  return []
 }
 
 export default function StudentsPage() {
-  const { data, role } = useSchool()
+  const { deleteStudent, role } = useSchool()
 
   const [students, setStudents] = useState<StudentWithPhoto[]>([])
   const [loading, setLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [query, setQuery] = useState('')
-  const [classFilter, setClassFilter] = useState('all')
+  const [error, setError] = useState("")
+
+  const [query, setQuery] = useState("")
+  const [classFilter, setClassFilter] = useState("all")
+
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<Student | null>(null)
+  const [editingStudent, setEditingStudent] =
+    useState<StudentWithPhoto | null>(null)
 
   const isAdmin =
-    safe(role).trim().toLowerCase() === 'admin'
+    safeString(role).trim().toLowerCase() === "admin"
 
   async function loadStudents() {
     try {
       setLoading(true)
-      setErrorMessage('')
+      setError("")
 
-      const response = await fetch('/api/students', {
-        cache: 'no-store',
+      const response = await fetch("/api/students", {
+        cache: "no-store",
       })
-
-      if (!response.ok) {
-        throw new Error(
-          `Students API returned ${response.status}`
-        )
-      }
 
       const json = await response.json()
 
-      const records = extractStudents(json)
+      if (!response.ok || json.success === false) {
+        throw new Error(
+          json.error || "Failed to load students"
+        )
+      }
 
-      const normalized = records
-        .map(normalizeStudent)
-        .filter((student) => student.id !== '')
+      const apiStudents = Array.isArray(json)
+        ? json
+        : Array.isArray(json.students)
+          ? json.students
+          : []
 
-      setStudents(normalized)
-    } catch (error) {
-      console.error('Failed to load students:', error)
+      const mapped = apiStudents.map(
+        (student: ApiStudent) =>
+          mapApiStudent(student)
+      )
+
+      setStudents(mapped)
+    } catch (err) {
+      console.error("Students page error:", err)
 
       setStudents([])
-      setErrorMessage(
-        'Students could not be loaded from the database.'
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Students could not be loaded from the database."
       )
     } finally {
       setLoading(false)
@@ -202,156 +179,92 @@ export default function StudentsPage() {
   }, [])
 
   const filtered = useMemo(() => {
-    const search = safe(query).trim().toLowerCase()
+    const search = query.trim().toLowerCase()
 
     return students.filter((student) => {
-      const name =
-        displayStudentName(student).toLowerCase()
+      const name = studentName(student).toLowerCase()
 
-      const admissionNo = safe(
+      const admissionNo = safeString(
         student.admissionNo
       ).toLowerCase()
 
-      const studentClass = safe(
+      const studentClass = normalizeClassName(
         student.classId
-      ).trim().toLowerCase()
+      ).toLowerCase()
+
+      const selectedClass =
+        normalizeClassName(classFilter).toLowerCase()
 
       const matchesSearch =
-        search === '' ||
+        search === "" ||
         name.includes(search) ||
         admissionNo.includes(search)
 
       const matchesClass =
-        classFilter === 'all' ||
-        studentClass ===
-          classFilter.toLowerCase()
+        classFilter === "all" ||
+        studentClass === selectedClass
 
       return matchesSearch && matchesClass
     })
   }, [students, query, classFilter])
 
-  function downloadClassList() {
-    if (filtered.length === 0) return
-
-    const selectedClass =
-      classFilter === 'all'
-        ? 'All Classes'
-        : classFilter
-
-    const headers = [
-      'No.',
-      'Admission Number',
-      'Student Name',
-      'Gender',
-      'Class',
-      'Stream',
-      'Guardian',
-      'Guardian Phone',
-      'Email',
-    ]
-
-    const rows = filtered.map((student, index) => [
-      index + 1,
-      safe(student.admissionNo),
-      displayStudentName(student),
-      safe(student.gender),
-      safe(student.classId),
-      safe(student.stream),
-      safe(student.guardianName),
-      safe(student.guardianPhone),
-      safe(student.email),
-    ])
-
-    const csvEscape = (value: unknown) => {
-      const text = safe(value)
-      return `"${text.replace(/"/g, '""')}"`
+  async function handleDelete(student: Student) {
+    if (!isAdmin) {
+      return
     }
 
-    const csv = [
-      headers.map(csvEscape).join(','),
-      ...rows.map((row) =>
-        row.map(csvEscape).join(',')
-      ),
-    ].join('\n')
-
-    const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;',
-    })
-
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-
-    link.href = url
-    link.download =
-      selectedClass.replace(/\s+/g, '_') +
-      '_Class_List.csv'
-
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    URL.revokeObjectURL(url)
-  }
-
-  function openRegisterDialog() {
-    if (!isAdmin) return
-
-    setEditing(null)
-    setDialogOpen(true)
-  }
-
-  function openEditDialog(student: Student) {
-    if (!isAdmin) return
-
-    setEditing(student)
-    setDialogOpen(true)
-  }
-
-  async function handleDelete(student: Student) {
-    if (!isAdmin) return
-
-    const name = displayStudentName(
-      student as StudentWithPhoto
-    )
+    const name = studentName(student)
 
     const confirmed = window.confirm(
       `Are you sure you want to remove ${name}?`
     )
 
-    if (!confirmed) return
+    if (!confirmed) {
+      return
+    }
 
     try {
-      const response = await fetch(
-        `/api/students/${encodeURIComponent(
-          safe(student.id)
-        )}`,
-        {
-          method: 'DELETE',
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error(
-          `Delete failed with status ${response.status}`
-        )
-      }
+      await deleteStudent(student.id)
 
       setStudents((current) =>
         current.filter(
-          (item) =>
-            safe(item.id) !==
-            safe(student.id)
+          (item) => String(item.id) !== String(student.id)
         )
       )
-    } catch (error) {
-      console.error(
-        'Failed to delete student:',
-        error
-      )
+    } catch (err) {
+      console.error("Failed to delete student:", err)
 
-      window.alert(
-        'The student could not be removed. Please try again.'
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to remove student."
       )
+    }
+  }
+
+  function handleEdit(student: StudentWithPhoto) {
+    if (!isAdmin) {
+      return
+    }
+
+    setEditingStudent(student)
+    setDialogOpen(true)
+  }
+
+  function handleAdd() {
+    if (!isAdmin) {
+      return
+    }
+
+    setEditingStudent(null)
+    setDialogOpen(true)
+  }
+
+  function handleDialogChange(open: boolean) {
+    setDialogOpen(open)
+
+    if (!open) {
+      setEditingStudent(null)
     }
   }
 
@@ -360,366 +273,348 @@ export default function StudentsPage() {
       <PageHeader
         title="Students"
         description="Register, search, group, and manage all enrolled students."
-        actions={
+      >
+        {isAdmin && (
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={downloadClassList}
-              disabled={
-                loading ||
-                filtered.length === 0
-              }
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
-              <Download className="h-4 w-4" />
-              Download Class List
-            </Button>
+              <UserPlus className="h-4 w-4" />
+              Register Student
+            </button>
 
-            {isAdmin && (
-              <Button
-                onClick={openRegisterDialog}
-              >
-                <UserPlus className="h-4 w-4" />
-                Register Student
-              </Button>
-            )}
-          </div>
-        }
-      />
-
-      {errorMessage && (
-        <Card className="border-destructive/40 bg-destructive/5 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-medium text-destructive">
-                Unable to load students
-              </p>
-
-              <p className="text-sm text-muted-foreground">
-                {errorMessage}
-              </p>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={loadStudents}
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
+              onClick={() => {
+                alert(
+                  "Learner import will be added here."
+                )
+              }}
             >
-              Try Again
-            </Button>
+              <Upload className="h-4 w-4" />
+              Import Learners
+            </button>
           </div>
-        </Card>
+        )}
+      </PageHeader>
+
+      {error && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+          <div className="font-semibold">
+            Unable to load students
+          </div>
+
+          <div className="mt-1">
+            {error}
+          </div>
+
+          <button
+            type="button"
+            onClick={loadStudents}
+            className="mt-3 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
       )}
 
-      <Card className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-muted p-2">
+              <Users className="h-5 w-5" />
+            </div>
 
-            <Input
-              placeholder="Search by name or admission number..."
-              value={query}
-              onChange={(event) =>
-                setQuery(event.target.value)
-              }
-              className="pl-9"
-            />
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Total Students
+              </p>
+
+              <p className="text-2xl font-bold">
+                {loading ? "..." : students.length}
+              </p>
+            </div>
           </div>
-
-          <Select
-            value={classFilter}
-            onValueChange={(value) =>
-              setClassFilter(value || 'all')
-            }
-          >
-            <SelectTrigger className="sm:w-56">
-              <SelectValue placeholder="Select class" />
-            </SelectTrigger>
-
-            <SelectContent>
-              <SelectItem value="all">
-                All Classes
-              </SelectItem>
-
-              {SCHOOL_CLASSES.map((className) => (
-                <SelectItem
-                  key={className}
-                  value={className}
-                >
-                  {className}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="rounded-lg border bg-card p-4">
           <p className="text-sm text-muted-foreground">
-            Showing{' '}
-            <span className="font-medium text-foreground">
-              {loading
-                ? '...'
-                : filtered.length}
-            </span>{' '}
-            of{' '}
-            <span className="font-medium text-foreground">
-              {loading
-                ? '...'
-                : students.length}
-            </span>{' '}
-            students
+            Showing
           </p>
 
-          <p className="text-sm font-medium text-foreground">
-            {classFilter === 'all'
-              ? 'All Classes'
-              : classFilter}
+          <p className="text-2xl font-bold">
+            {loading ? "..." : filtered.length}
           </p>
         </div>
-      </Card>
 
-      <Card className="overflow-hidden p-0">
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-sm text-muted-foreground">
+            Classes
+          </p>
+
+          <p className="text-2xl font-bold">
+            {SCHOOL_CLASSES.length}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 md:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+          <input
+            value={query}
+            onChange={(event) =>
+              setQuery(event.target.value)
+            }
+            placeholder="Search by student name or admission number..."
+            className="w-full rounded-md border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <select
+          value={classFilter}
+          onChange={(event) =>
+            setClassFilter(event.target.value)
+          }
+          className="rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="all">All Classes</option>
+
+          {SCHOOL_CLASSES.map((className) => (
+            <option
+              key={className}
+              value={className}
+            >
+              {className}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="text-sm text-muted-foreground">
+        Showing{" "}
+        <span className="font-semibold text-foreground">
+          {loading ? 0 : filtered.length}
+        </span>{" "}
+        of{" "}
+        <span className="font-semibold text-foreground">
+          {loading ? 0 : students.length}
+        </span>{" "}
+        students
+      </div>
+
+      <div className="overflow-hidden rounded-lg border bg-card">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Adm. No</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Gender</TableHead>
-                <TableHead>Guardian</TableHead>
-                <TableHead>Fee Balance</TableHead>
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="border-b bg-muted/50">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  Student
+                </th>
+
+                <th className="px-4 py-3 text-left font-semibold">
+                  Adm. No
+                </th>
+
+                <th className="px-4 py-3 text-left font-semibold">
+                  Class
+                </th>
+
+                <th className="px-4 py-3 text-left font-semibold">
+                  Gender
+                </th>
+
+                <th className="px-4 py-3 text-left font-semibold">
+                  Guardian
+                </th>
+
+                <th className="px-4 py-3 text-left font-semibold">
+                  Fee Balance
+                </th>
 
                 {isAdmin && (
-                  <TableHead className="w-10" />
+                  <th className="px-4 py-3 text-right font-semibold">
+                    Actions
+                  </th>
                 )}
-              </TableRow>
-            </TableHeader>
+              </tr>
+            </thead>
 
-            <TableBody>
-              {loading && (
-                <TableRow>
-                  <TableCell
+            <tbody className="divide-y">
+              {loading ? (
+                <tr>
+                  <td
                     colSpan={isAdmin ? 7 : 6}
-                    className="py-12 text-center text-muted-foreground"
+                    className="px-4 py-12 text-center text-muted-foreground"
                   >
                     Loading students...
-                  </TableCell>
-                </TableRow>
-              )}
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={isAdmin ? 7 : 6}
+                    className="px-4 py-12 text-center text-muted-foreground"
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Users className="h-10 w-10 opacity-40" />
 
-              {!loading &&
+                      <p className="font-medium">
+                        No students found
+                      </p>
+
+                      <p className="text-xs">
+                        Try changing your search or class filter.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
                 filtered.map((student) => {
                   const fee = feeForStudent(
-                    {
-                      ...data,
-                      students,
-                    },
                     student.id
                   )
 
-                  const photoUrl = safe(
-                    student.photoUrl
-                  ).trim()
-
-                  const name =
-                    displayStudentName(student)
+                  const balance =
+                    typeof fee?.balance === "number"
+                      ? fee.balance
+                      : 0
 
                   return (
-                    <TableRow
+                    <tr
                       key={student.id}
+                      className="hover:bg-muted/30"
                     >
-                      <TableCell>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          {photoUrl ? (
+                          {student.photoUrl ? (
                             <img
-                              src={photoUrl}
-                              alt={`${name} passport photo`}
-                              className="h-12 w-12 shrink-0 rounded-full border object-cover"
+                              src={student.photoUrl}
+                              alt={studentName(student)}
+                              className="h-10 w-10 rounded-full border object-cover"
                             />
                           ) : (
-                            <span
-                              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border bg-primary/10 text-xs font-semibold text-primary"
-                              aria-label={`No passport photo for ${name}`}
-                            >
-                              {safe(
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                              {safeString(
                                 student.firstName
                               )
                                 .charAt(0)
                                 .toUpperCase()}
-                              {safe(
+                              {safeString(
                                 student.lastName
                               )
                                 .charAt(0)
                                 .toUpperCase()}
-                            </span>
+                            </div>
                           )}
 
-                          <div className="min-w-0">
-                            <p className="font-medium text-foreground">
-                              {name}
-                            </p>
+                          <div>
+                            <div className="font-medium">
+                              {studentName(student)}
+                            </div>
 
-                            {safe(
-                              student.email
-                            ) && (
-                              <p className="truncate text-xs text-muted-foreground">
-                                {safe(
-                                  student.email
-                                )}
-                              </p>
-                            )}
+                            <div className="text-xs text-muted-foreground">
+                              {student.status ||
+                                "Active"}
+                            </div>
                           </div>
                         </div>
-                      </TableCell>
+                      </td>
 
-                      <TableCell className="font-mono text-xs">
-                        {safe(
-                          student.admissionNo
-                        ) || '—'}
-                      </TableCell>
+                      <td className="px-4 py-3 font-medium">
+                        {student.admissionNo || "—"}
+                      </td>
 
-                      <TableCell>
-                        {safe(
+                      <td className="px-4 py-3">
+                        {normalizeClassName(
                           student.classId
-                        ) || '—'}
-
-                        {safe(
-                          student.stream
-                        ) && (
-                          <span className="text-muted-foreground">
-                            {' '}
-                            ·{' '}
-                            {safe(
-                              student.stream
-                            )}
+                        ) || "—"}
+                        {student.stream && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({student.stream})
                           </span>
                         )}
-                      </TableCell>
+                      </td>
 
-                      <TableCell>
-                        {safe(
-                          student.gender
-                        ) || '—'}
-                      </TableCell>
+                      <td className="px-4 py-3">
+                        {student.gender || "—"}
+                      </td>
 
-                      <TableCell>
-                        <p className="text-sm">
-                          {safe(
-                            student.guardianName
-                          ) || '—'}
-                        </p>
+                      <td className="px-4 py-3">
+                        <div>
+                          {student.guardianName || "—"}
+                        </div>
 
-                        {safe(
-                          student.guardianPhone
-                        ) && (
-                          <p className="text-xs text-muted-foreground">
-                            {safe(
-                              student.guardianPhone
-                            )}
-                          </p>
+                        {student.guardianPhone && (
+                          <div className="text-xs text-muted-foreground">
+                            {student.guardianPhone}
+                          </div>
                         )}
-                      </TableCell>
+                      </td>
 
-                      <TableCell>
-                        {fee.balance === 0 ? (
-                          <Badge
-                            variant="secondary"
-                            className="bg-emerald-50 text-emerald-700"
-                          >
+                      <td className="px-4 py-3">
+                        <span
+                          className={
+                            balance > 0
+                              ? "font-medium text-destructive"
+                              : "font-medium"
+                          }
+                        >
+                          {formatKES(balance)}
+                        </span>
+
+                        {balance <= 0 && (
+                          <div className="text-xs text-muted-foreground">
                             Cleared
-                          </Badge>
-                        ) : (
-                          <span className="text-sm font-medium text-destructive">
-                            {formatKES(
-                              fee.balance
-                            )}
-                          </span>
+                          </div>
                         )}
-                      </TableCell>
+                      </td>
 
                       {isAdmin && (
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              asChild
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleEdit(student)
+                              }
+                              className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
                             >
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
+                              <Edit className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
 
-                                <span className="sr-only">
-                                  Actions for{' '}
-                                  {name}
-                                </span>
-                              </Button>
-                            </DropdownMenuTrigger>
-
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  openEditDialog(
-                                    student
-                                  )
-                                }
-                              >
-                                <Pencil className="h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onClick={() =>
-                                  handleDelete(
-                                    student
-                                  )
-                                }
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Remove
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDelete(student)
+                              }
+                              className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Remove
+                            </button>
+                          </div>
+                        </td>
                       )}
-                    </TableRow>
+                    </tr>
                   )
-                })}
-
-              {!loading &&
-                filtered.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={isAdmin ? 7 : 6}
-                      className="py-12 text-center text-muted-foreground"
-                    >
-                      <Plus className="mx-auto mb-2 h-8 w-8 opacity-40" />
-
-                      <p>
-                        {students.length === 0
-                          ? 'No students were returned from the database.'
-                          : 'No students match your search or class filter.'}
-                      </p>
-                    </TableCell>
-                  </TableRow>
-                )}
-            </TableBody>
-          </Table>
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      </Card>
+      </div>
 
       {isAdmin && (
         <StudentDialog
           open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open)
-
-            if (!open) {
-              loadStudents()
-            }
-          }}
-          student={editing}
+          onOpenChange={handleDialogChange}
+          student={editingStudent}
         />
       )}
     </div>
