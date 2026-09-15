@@ -247,10 +247,16 @@ function connectStudentsToClasses(
         ''
       ).trim()
 
-      return (
-        name.toLowerCase() ===
-        className.toLowerCase()
-      )
+     const normalizeClassName = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+
+return (
+  normalizeClassName(name) ===
+  normalizeClassName(className)
+)
     })
 
     if (!matchingClass) {
