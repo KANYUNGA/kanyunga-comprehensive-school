@@ -1,31 +1,48 @@
-import { getDb } from "@/lib/db"
-import { requireAdmin } from "@/lib/server-auth"
+
+import { getDb } from '@/lib/db'
+import { requireAdmin } from '@/lib/server-auth'
 
 const sql = getDb()
 
-function mapStudent(s: any) {
+function clean(value: unknown): string {
+  return value == null ? '' : String(value)
+}
+
+function dateOnly(value: unknown): string {
+  if (!value) return ''
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10)
+  }
+
+  const text = String(value)
+
+  if (text.includes('T')) {
+    return text.slice(0, 10)
+  }
+
+  return text.slice(0, 10)
+}
+
+function mapStudent(row: any) {
   return {
-    id: String(s.id),
-    admissionNo: s.admission_number ?? "",
-    firstName: s.first_name ?? "",
-    middleName: s.middle_name ?? "",
-    lastName: s.last_name ?? "",
-    gender: s.gender ?? "Male",
-    classId: s.class_name ?? "",
-    className: s.class_name ?? "",
-    stream: s.stream ?? "",
-    dateOfBirth: s.date_of_birth
-      ? new Date(s.date_of_birth).toISOString().slice(0, 10)
-      : "",
-    guardianName: s.parent_name ?? "",
-    guardianPhone: s.parent_phone ?? "",
-    address: s.address ?? "",
-    email: "",
-    admissionDate: s.admission_date
-      ? new Date(s.admission_date).toISOString().slice(0, 10)
-      : "",
-    status: s.status ?? "Active",
-    photoUrl: s.photo_url ?? "",
+    id: String(row.id),
+    admissionNo: clean(row.admission_number),
+    firstName: clean(row.first_name),
+    middleName: clean(row.middle_name),
+    lastName: clean(row.last_name),
+    gender: clean(row.gender),
+    classId: clean(row.class_name),
+    className: clean(row.class_name),
+    stream: clean(row.stream),
+    dateOfBirth: dateOnly(row.date_of_birth),
+    guardianName: clean(row.parent_name),
+    guardianPhone: clean(row.parent_phone),
+    address: clean(row.address),
+    email: clean(row.email),
+    admissionDate: dateOnly(row.admission_date),
+    status: clean(row.status) || 'Active',
+    photoUrl: clean(row.photo_url),
   }
 }
 
@@ -45,24 +62,35 @@ export async function GET() {
         parent_name,
         parent_phone,
         address,
+        email,
         admission_date,
         status,
-        photo_url
+        photo_url,
+        created_at
       FROM students
-      ORDER BY id ASC
+      ORDER BY
+        class_name ASC,
+        first_name ASC,
+        last_name ASC,
+        id ASC
     `
 
-    return Response.json(students.map(mapStudent))
+    return Response.json(
+      students.map(mapStudent),
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      }
+    )
   } catch (error) {
-    console.error("Failed to fetch students:", error)
+    console.error('GET /api/students failed:', error)
 
     return Response.json(
       {
-        error: "Failed to fetch students",
-        detail:
-          error instanceof Error
-            ? error.message
-            : "Unknown error",
+        success: false,
+        error: 'Failed to load students',
       },
       { status: 500 }
     )
@@ -77,30 +105,122 @@ export async function POST(request: Request) {
   }
 
   try {
-    const student = await request.json()
+    const body = await request.json()
 
-    if (!student.admissionNo || !student.firstName) {
+    const admissionNo = clean(
+      body.admissionNo ??
+        body.admission_number
+    ).trim()
+
+    const firstName = clean(
+      body.firstName ??
+        body.first_name
+    ).trim()
+
+    const middleName = clean(
+      body.middleName ??
+        body.middle_name
+    ).trim()
+
+    const lastName = clean(
+      body.lastName ??
+        body.last_name
+    ).trim()
+
+    const gender = clean(body.gender).trim()
+
+    const className = clean(
+      body.classId ??
+        body.className ??
+        body.class_name
+    ).trim()
+
+    const stream = clean(body.stream).trim()
+
+    const dateOfBirth = clean(
+      body.dateOfBirth ??
+        body.date_of_birth
+    ).trim()
+
+    const guardianName = clean(
+      body.guardianName ??
+        body.guardian_name ??
+        body.parentName ??
+        body.parent_name
+    ).trim()
+
+    const guardianPhone = clean(
+      body.guardianPhone ??
+        body.guardian_phone ??
+        body.parentPhone ??
+        body.parent_phone
+    ).trim()
+
+    const address = clean(body.address).trim()
+
+    const email = clean(body.email).trim()
+
+    const admissionDate =
+      clean(
+        body.admissionDate ??
+          body.admission_date
+      ).trim() ||
+      new Date().toISOString().slice(0, 10)
+
+    const status =
+      clean(body.status).trim() || 'Active'
+
+    const photoUrl = clean(
+      body.photoUrl ??
+        body.photo_url
+    ).trim()
+
+    if (!admissionNo) {
+      return Response.json(
+        { error: 'Admission number is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!firstName) {
+      return Response.json(
+        { error: 'First name is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!lastName) {
+      return Response.json(
+        { error: 'Last name is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!className) {
+      return Response.json(
+        { error: 'Class is required' },
+        { status: 400 }
+      )
+    }
+
+    const existing = await sql`
+      SELECT id
+      FROM students
+      WHERE admission_number = ${admissionNo}
+      LIMIT 1
+    `
+
+    if (existing.length > 0) {
       return Response.json(
         {
-          error: "Admission number and first name are required",
+          error:
+            'A student with this admission number already exists',
         },
-        { status: 400 }
+        { status: 409 }
       )
     }
 
-    if (!student.className && !student.classId) {
-      return Response.json(
-        { error: "Class is required" },
-        { status: 400 }
-      )
-    }
-
-    const className =
-      student.className?.toString().trim() ||
-      student.classId?.toString().trim() ||
-      ""
-
-    const result = await sql`
+    const inserted = await sql`
       INSERT INTO students (
         admission_number,
         first_name,
@@ -113,25 +233,27 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
+        email,
         admission_date,
         status,
         photo_url
       )
       VALUES (
-        ${student.admissionNo},
-        ${student.firstName},
-        ${student.middleName || null},
-        ${student.lastName || null},
-        ${student.gender || "Male"},
-        ${student.dateOfBirth || null},
+        ${admissionNo},
+        ${firstName},
+        ${middleName},
+        ${lastName},
+        ${gender},
+        ${dateOfBirth || null},
         ${className},
-        ${student.stream || ""},
-        ${student.guardianName || ""},
-        ${student.guardianPhone || ""},
-        ${student.address || null},
-        ${student.admissionDate || null},
-        ${student.status || "Active"},
-        ${student.photoUrl || null}
+        ${stream},
+        ${guardianName},
+        ${guardianPhone},
+        ${address},
+        ${email},
+        ${admissionDate || null},
+        ${status},
+        ${photoUrl}
       )
       RETURNING
         id,
@@ -146,22 +268,24 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
+        email,
         admission_date,
         status,
-        photo_url
+        photo_url,
+        created_at
     `
 
-    return Response.json(mapStudent(result[0]), { status: 201 })
+    return Response.json(
+      mapStudent(inserted[0]),
+      { status: 201 }
+    )
   } catch (error) {
-    console.error("Failed to create student:", error)
+    console.error('POST /api/students failed:', error)
 
     return Response.json(
       {
-        error: "Failed to create student",
-        detail:
-          error instanceof Error
-            ? error.message
-            : "Unknown error",
+        success: false,
+        error: 'Failed to create student',
       },
       { status: 500 }
     )
