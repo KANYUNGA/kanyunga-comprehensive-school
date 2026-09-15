@@ -21,12 +21,16 @@ import {
 } from '@/components/ui/select'
 import type { Gender, Student } from '@/lib/data'
 
+type StudentWithPhoto = Student & {
+  photoUrl?: string
+}
+
 type Draft = Omit<Student, 'id'> & {
   photoUrl?: string
 }
 
 const SCHOOL_CLASSES = [
-  'Play Group',
+  'Playgroup',
   'PP1',
   'PP2',
   'Grade 1',
@@ -41,10 +45,10 @@ const SCHOOL_CLASSES = [
 ]
 
 const CLASS_STREAMS: Record<string, string[]> = {
-  'Play Group': ['Main'],
+  Playgroup: ['Main'],
   PP1: ['Main'],
   PP2: ['Main'],
-  'Grade 1': ['Main'],
+  'Grade 1': ['A'],
   'Grade 2': ['Main'],
   'Grade 3': ['Main'],
   'Grade 4': ['Main'],
@@ -55,21 +59,29 @@ const CLASS_STREAMS: Record<string, string[]> = {
   'Grade 9': ['Main'],
 }
 
-const empty = (className: string): Draft => ({
-  admissionNo: '',
-  firstName: '',
-  lastName: '',
-  gender: 'Male',
-  classId: className,
-  stream: CLASS_STREAMS[className]?.[0] ?? 'Main',
-  dateOfBirth: '',
-  guardianName: '',
-  guardianPhone: '',
-  email: '',
-  admissionDate: new Date().toISOString().slice(0, 10),
-  status: 'Active',
-  photoUrl: '',
-})
+function safeString(value: unknown): string {
+  return String(value ?? '').trim()
+}
+
+function empty(className = 'Playgroup'): Draft {
+  return {
+    admissionNo: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    gender: 'Male',
+    classId: className,
+    stream: CLASS_STREAMS[className]?.[0] ?? 'Main',
+    dateOfBirth: '',
+    guardianName: '',
+    guardianPhone: '',
+    address: '',
+    email: '',
+    admissionDate: new Date().toISOString().slice(0, 10),
+    status: 'Active',
+    photoUrl: '',
+  }
+}
 
 export function StudentDialog({
   open,
@@ -81,7 +93,7 @@ export function StudentDialog({
   student: Student | null
 }) {
   const [draft, setDraft] = useState<Draft>(() =>
-    empty('Play Group')
+    empty('Playgroup')
   )
 
   const [saving, setSaving] = useState(false)
@@ -89,33 +101,46 @@ export function StudentDialog({
 
   useEffect(() => {
     if (student) {
-      const { id, ...rest } = student
+      const existing = student as StudentWithPhoto
 
       setDraft({
-        ...rest,
-        classId: rest.classId || 'Play Group',
-        stream: rest.stream || 'Main',
-        photoUrl:
-          (student as Student & { photoUrl?: string }).photoUrl || '',
+        admissionNo: safeString(existing.admissionNo),
+        firstName: safeString(existing.firstName),
+        middleName: safeString(existing.middleName),
+        lastName: safeString(existing.lastName),
+        gender: (safeString(existing.gender) || 'Male') as Gender,
+        classId: safeString(existing.classId) || 'Playgroup',
+        stream:
+          safeString(existing.stream) ||
+          CLASS_STREAMS[safeString(existing.classId)]?.[0] ||
+          'Main',
+        dateOfBirth: safeString(existing.dateOfBirth),
+        guardianName: safeString(existing.guardianName),
+        guardianPhone: safeString(existing.guardianPhone),
+        address: safeString(existing.address),
+        email: safeString(existing.email),
+        admissionDate: safeString(existing.admissionDate),
+        status: safeString(existing.status) || 'Active',
+        photoUrl: safeString(existing.photoUrl),
       })
     } else {
-      setDraft(empty('Play Group'))
+      setDraft(empty('Playgroup'))
     }
 
     setError('')
   }, [student, open])
 
-  const selectedClass = draft.classId
+  const selectedClass = safeString(draft.classId) || 'Playgroup'
 
   const availableStreams =
     CLASS_STREAMS[selectedClass] ?? ['Main']
 
-  function set<K extends keyof Draft>(
+  function setField<K extends keyof Draft>(
     key: K,
     value: Draft[K]
   ) {
-    setDraft((d) => ({
-      ...d,
+    setDraft((current) => ({
+      ...current,
       [key]: value,
     }))
   }
@@ -142,7 +167,14 @@ export function StudentDialog({
     const reader = new FileReader()
 
     reader.onload = () => {
-      set('photoUrl', String(reader.result))
+      const result = String(reader.result ?? '')
+
+      if (!result) {
+        setError('Unable to read the selected photo.')
+        return
+      }
+
+      setField('photoUrl', result)
       setError('')
     }
 
@@ -154,15 +186,31 @@ export function StudentDialog({
   }
 
   async function handleSave() {
-   if (
-  !String(draft.firstName ?? '').trim() ||
-  !String(draft.lastName ?? '').trim()
-) {
-  setError('First name and last name are required.')
-  return
-}
+    const firstName = safeString(draft.firstName)
+    const middleName = safeString(draft.middleName)
+    const lastName = safeString(draft.lastName)
+    const admissionNo = safeString(draft.admissionNo)
+    const className = safeString(draft.classId)
+    const stream = safeString(draft.stream)
+    const dateOfBirth = safeString(draft.dateOfBirth)
+    const admissionDate = safeString(draft.admissionDate)
+    const guardianName = safeString(draft.guardianName)
+    const guardianPhone = safeString(draft.guardianPhone)
+    const address = safeString(draft.address)
+    const email = safeString(draft.email)
+    const photoUrl = safeString(draft.photoUrl)
 
-    if (!draft.classId) {
+    if (!firstName) {
+      setError('First name is required.')
+      return
+    }
+
+    if (!lastName) {
+      setError('Last name is required.')
+      return
+    }
+
+    if (!className) {
       setError('Please select a class.')
       return
     }
@@ -171,61 +219,74 @@ export function StudentDialog({
     setError('')
 
     try {
+      const generatedAdmissionNo =
+        admissionNo ||
+        `KCS-${Math.floor(2000 + Math.random() * 8000)}`
+
       const body = {
-        admissionNo:
-          draft.admissionNo ||
-          `KCS-${Math.floor(2000 + Math.random() * 8000)}`,
+        admissionNo: generatedAdmissionNo,
 
-  firstName: String(draft.firstName ?? '').trim(),
-middleName: String(draft.middleName ?? '').trim(),
-lastName: String(draft.lastName ?? '').trim(),
-        gender: draft.gender,
+        firstName,
+        middleName,
+        lastName,
 
-        classId: draft.classId,
-        className: draft.classId,
+        gender: draft.gender || 'Male',
 
-        stream: draft.stream || 'Main',
+        classId: className,
+        className,
 
-        dateOfBirth: draft.dateOfBirth || null,
+        stream: stream || CLASS_STREAMS[className]?.[0] || 'Main',
 
-       guardianName: String(draft.guardianName ?? '').trim(),
-guardianPhone: String(draft.guardianPhone ?? '').trim(),
-email: String(draft.email ?? '').trim(),
-        address: draft.address?.trim() || '',
+        dateOfBirth: dateOfBirth || null,
 
-        admissionDate: draft.admissionDate || null,
+        guardianName,
+        guardianPhone,
+        address,
+        email,
 
-        status: draft.status || 'Active',
+        admissionDate: admissionDate || null,
 
-        photoUrl: draft.photoUrl || null,
+        status: safeString(draft.status) || 'Active',
+
+        photoUrl: photoUrl || null,
       }
 
-      const response = await fetch(
-        student
-          ? `/api/students/${encodeURIComponent(student.id)}`
-          : '/api/students',
-        {
-          method: student ? 'PUT' : 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        }
-      )
+      const url = student
+        ? `/api/students/${encodeURIComponent(String(student.id))}`
+        : '/api/students'
 
-      const result = await response.json()
+      const response = await fetch(url, {
+        method: student ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      let result: any = null
+
+      try {
+        result = await response.json()
+      } catch {
+        result = null
+      }
 
       if (!response.ok) {
         throw new Error(
-          result.error || 'Failed to save student.'
+          result?.error ||
+            `Failed to ${student ? 'update' : 'register'} student.`
         )
       }
 
       onOpenChange(false)
 
+      /*
+       * Reload the page so the newly inserted/updated
+       * Neon record and passport photo appear immediately.
+       */
       window.location.reload()
     } catch (err) {
-      console.error(err)
+      console.error('Student save error:', err)
 
       setError(
         err instanceof Error
@@ -268,8 +329,8 @@ email: String(draft.email ?? '').trim(),
               />
             ) : (
               <span className="text-3xl font-semibold text-muted-foreground">
-                {draft.firstName?.[0] ?? 'L'}
-                {draft.lastName?.[0] ?? ''}
+                {safeString(draft.firstName).charAt(0) || 'L'}
+                {safeString(draft.lastName).charAt(0)}
               </span>
             )}
           </div>
@@ -279,7 +340,10 @@ email: String(draft.email ?? '').trim(),
               htmlFor="learner-photo"
               className="cursor-pointer rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
             >
-              📷 {draft.photoUrl ? 'Change Photo' : 'Upload Passport Photo'}
+              📷{' '}
+              {draft.photoUrl
+                ? 'Change Photo'
+                : 'Upload Passport Photo'}
             </Label>
 
             <Input
@@ -300,50 +364,53 @@ email: String(draft.email ?? '').trim(),
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <Field label="First name">
             <Input
-              value={draft.firstName}
-              onChange={(e) =>
-                set('firstName', e.target.value)
+              value={safeString(draft.firstName)}
+              onChange={(event) =>
+                setField('firstName', event.target.value)
               }
+              placeholder="First name"
             />
           </Field>
 
           <Field label="Middle name">
             <Input
-              value={draft.middleName || ''}
-              onChange={(e) =>
-                set('middleName', e.target.value)
+              value={safeString(draft.middleName)}
+              onChange={(event) =>
+                setField('middleName', event.target.value)
               }
+              placeholder="Middle name"
             />
           </Field>
 
           <Field label="Last name">
             <Input
-              value={draft.lastName}
-              onChange={(e) =>
-                set('lastName', e.target.value)
+              value={safeString(draft.lastName)}
+              onChange={(event) =>
+                setField('lastName', event.target.value)
               }
+              placeholder="Last name"
             />
           </Field>
 
           <Field label="Admission No.">
             <Input
-              value={draft.admissionNo}
-              onChange={(e) =>
-                set('admissionNo', e.target.value)
+              value={safeString(draft.admissionNo)}
+              onChange={(event) =>
+                setField('admissionNo', event.target.value)
               }
-              placeholder="Auto"
+              placeholder="Auto-generated if blank"
             />
           </Field>
 
           <Field label="Gender">
             <Select
-              value={draft.gender}
-              onValueChange={(v) =>
-                set('gender', v as Gender)
+              value={draft.gender || 'Male'}
+              onValueChange={(value) =>
+                setField('gender', value as Gender)
               }
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select gender" />
               </SelectTrigger>
 
               <SelectContent>
@@ -360,14 +427,14 @@ email: String(draft.email ?? '').trim(),
 
           <Field label="Class">
             <Select
-              value={draft.classId}
-              onValueChange={(v) => {
+              value={selectedClass}
+              onValueChange={(value) => {
                 const streams =
-                  CLASS_STREAMS[v] ?? ['Main']
+                  CLASS_STREAMS[value] ?? ['Main']
 
-                setDraft((d) => ({
-                  ...d,
-                  classId: v,
+                setDraft((current) => ({
+                  ...current,
+                  classId: value,
                   stream: streams[0],
                 }))
               }}
@@ -391,9 +458,12 @@ email: String(draft.email ?? '').trim(),
 
           <Field label="Stream">
             <Select
-              value={draft.stream}
-              onValueChange={(v) =>
-                set('stream', v)
+              value={
+                safeString(draft.stream) ||
+                availableStreams[0]
+              }
+              onValueChange={(value) =>
+                setField('stream', value)
               }
             >
               <SelectTrigger>
@@ -416,9 +486,12 @@ email: String(draft.email ?? '').trim(),
           <Field label="Date of birth">
             <Input
               type="date"
-              value={draft.dateOfBirth}
-              onChange={(e) =>
-                set('dateOfBirth', e.target.value)
+              value={safeString(draft.dateOfBirth)}
+              onChange={(event) =>
+                setField(
+                  'dateOfBirth',
+                  event.target.value
+                )
               }
             />
           </Field>
@@ -426,38 +499,53 @@ email: String(draft.email ?? '').trim(),
           <Field label="Admission date">
             <Input
               type="date"
-              value={draft.admissionDate}
-              onChange={(e) =>
-                set('admissionDate', e.target.value)
+              value={safeString(draft.admissionDate)}
+              onChange={(event) =>
+                setField(
+                  'admissionDate',
+                  event.target.value
+                )
               }
             />
           </Field>
 
           <Field label="Guardian name">
             <Input
-              value={draft.guardianName}
-              onChange={(e) =>
-                set('guardianName', e.target.value)
+              value={safeString(draft.guardianName)}
+              onChange={(event) =>
+                setField(
+                  'guardianName',
+                  event.target.value
+                )
               }
+              placeholder="Parent / guardian name"
             />
           </Field>
 
           <Field label="Guardian phone">
             <Input
-              value={draft.guardianPhone}
-              onChange={(e) =>
-                set('guardianPhone', e.target.value)
+              value={safeString(draft.guardianPhone)}
+              onChange={(event) =>
+                setField(
+                  'guardianPhone',
+                  event.target.value
+                )
               }
+              placeholder="Phone number"
             />
           </Field>
 
           <div className="sm:col-span-2">
             <Field label="Address">
               <Input
-                value={draft.address || ''}
-                onChange={(e) =>
-                  set('address', e.target.value)
+                value={safeString(draft.address)}
+                onChange={(event) =>
+                  setField(
+                    'address',
+                    event.target.value
+                  )
                 }
+                placeholder="Home address"
               />
             </Field>
           </div>
@@ -466,23 +554,30 @@ email: String(draft.email ?? '').trim(),
             <Field label="Email">
               <Input
                 type="email"
-                value={draft.email}
-                onChange={(e) =>
-                  set('email', e.target.value)
+                value={safeString(draft.email)}
+                onChange={(event) =>
+                  setField(
+                    'email',
+                    event.target.value
+                  )
                 }
+                placeholder="Email address"
               />
             </Field>
           </div>
         </div>
 
         {error && (
-          <p className="text-sm text-destructive">
-            {error}
-          </p>
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3">
+            <p className="text-sm text-destructive">
+              {error}
+            </p>
+          </div>
         )}
 
         <DialogFooter>
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={saving}
@@ -491,6 +586,7 @@ email: String(draft.email ?? '').trim(),
           </Button>
 
           <Button
+            type="button"
             onClick={handleSave}
             disabled={saving}
           >
