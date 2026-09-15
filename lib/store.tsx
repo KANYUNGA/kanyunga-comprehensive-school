@@ -360,6 +360,13 @@ export function SchoolProvider({
 
   const [loggedIn, setLoggedIn] =
     useState(false)
+  useEffect(() => {
+  console.log('🏫 SCHOOL PROVIDER MOUNTED')
+  
+  return () => {
+    console.log('🏫 SCHOOL PROVIDER UNMOUNTED')
+  }
+}, [])
 
   
   const loadData = async () => {
