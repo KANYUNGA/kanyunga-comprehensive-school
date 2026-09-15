@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CreditCard,
   LayoutGrid,
@@ -42,58 +42,183 @@ export default function DashboardPage() {
   const { data } = useSchool()
 
   /*
-   * TEMPORARY DIAGNOSTIC
+   * The global SchoolProvider loads the database data for the
+   * whole application. The Dashboard also refreshes the four
+   * main dashboard collections directly from their APIs.
    *
-   * This tells us whether the Dashboard receives
-   * the updated database data after SchoolProvider
-   * finishes loading.
+   * This makes the dashboard statistics independent of the
+   * initial loading timing of the global provider.
    */
+
+  const [dashboardStudents, setDashboardStudents] = useState<
+    typeof data.students
+  >([])
+
+  const [dashboardTeachers, setDashboardTeachers] = useState<
+    typeof data.teachers
+  >([])
+
+  const [dashboardClasses, setDashboardClasses] = useState<
+    typeof data.classes
+  >([])
+
+  const [dashboardSubjects, setDashboardSubjects] = useState<
+    typeof data.subjects
+  >([])
+
+  const [dashboardLoading, setDashboardLoading] = useState(true)
+
   useEffect(() => {
-    console.log('DASHBOARD DATA UPDATED:', {
-      students: data.students?.length ?? 0,
-      teachers: data.teachers?.length ?? 0,
-      classes: data.classes?.length ?? 0,
-      subjects: data.subjects?.length ?? 0,
-      payments: data.payments?.length ?? 0,
-      attendance: data.attendance?.length ?? 0,
-      fees: data.fees?.length ?? 0,
-    })
-  }, [data])
+    let cancelled = false
 
-  console.log('DASHBOARD DATA:', {
-    students: data.students?.length ?? 0,
-    teachers: data.teachers?.length ?? 0,
-    classes: data.classes?.length ?? 0,
-    subjects: data.subjects?.length ?? 0,
-    payments: data.payments?.length ?? 0,
-    attendance: data.attendance?.length ?? 0,
-    fees: data.fees?.length ?? 0,
-  })
+    async function loadDashboardData() {
+      try {
+        setDashboardLoading(true)
 
-  // Safely guarantee that all dashboard collections are arrays.
-  const students = Array.isArray(data.students)
-    ? data.students
-    : []
+        const [
+          studentsResponse,
+          teachersResponse,
+          classesResponse,
+          subjectsResponse,
+        ] = await Promise.all([
+          fetch('/api/students', {
+            cache: 'no-store',
+          }),
+          fetch('/api/teachers', {
+            cache: 'no-store',
+          }),
+          fetch('/api/classes', {
+            cache: 'no-store',
+          }),
+          fetch('/api/subjects', {
+            cache: 'no-store',
+          }),
+        ])
 
-  const teachers = Array.isArray(data.teachers)
-    ? data.teachers
-    : []
+        if (!studentsResponse.ok) {
+          throw new Error(
+            `/api/students returned HTTP ${studentsResponse.status}`
+          )
+        }
 
-  const classes = Array.isArray(data.classes)
-    ? data.classes
-    : []
+        if (!teachersResponse.ok) {
+          throw new Error(
+            `/api/teachers returned HTTP ${teachersResponse.status}`
+          )
+        }
 
-  const subjects = Array.isArray(data.subjects)
-    ? data.subjects
-    : []
+        if (!classesResponse.ok) {
+          throw new Error(
+            `/api/classes returned HTTP ${classesResponse.status}`
+          )
+        }
+
+        if (!subjectsResponse.ok) {
+          throw new Error(
+            `/api/subjects returned HTTP ${subjectsResponse.status}`
+          )
+        }
+
+        const studentsJson = await studentsResponse.json()
+        const teachersJson = await teachersResponse.json()
+        const classesJson = await classesResponse.json()
+        const subjectsJson = await subjectsResponse.json()
+
+        const studentsArray = Array.isArray(studentsJson)
+          ? studentsJson
+          : Array.isArray(studentsJson?.students)
+            ? studentsJson.students
+            : []
+
+        const teachersArray = Array.isArray(teachersJson)
+          ? teachersJson
+          : Array.isArray(teachersJson?.teachers)
+            ? teachersJson.teachers
+            : []
+
+        const classesArray = Array.isArray(classesJson)
+          ? classesJson
+          : Array.isArray(classesJson?.classes)
+            ? classesJson.classes
+            : []
+
+        const subjectsArray = Array.isArray(subjectsJson)
+          ? subjectsJson
+          : Array.isArray(subjectsJson?.subjects)
+            ? subjectsJson.subjects
+            : []
+
+        if (!cancelled) {
+          setDashboardStudents(studentsArray)
+          setDashboardTeachers(teachersArray)
+          setDashboardClasses(classesArray)
+          setDashboardSubjects(subjectsArray)
+
+          console.log('LIVE DASHBOARD API DATA:', {
+            students: studentsArray.length,
+            teachers: teachersArray.length,
+            classes: classesArray.length,
+            subjects: subjectsArray.length,
+          })
+        }
+      } catch (error) {
+        console.error(
+          'Failed to load dashboard API data:',
+          error
+        )
+      } finally {
+        if (!cancelled) {
+          setDashboardLoading(false)
+        }
+      }
+    }
+
+    loadDashboardData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /*
+   * Use the directly loaded API data when available.
+   * Fall back to the global SchoolProvider data so the
+   * dashboard still works if an API request temporarily fails.
+   */
+
+  const students =
+    dashboardStudents.length > 0
+      ? dashboardStudents
+      : Array.isArray(data.students)
+        ? data.students
+        : []
+
+  const teachers =
+    dashboardTeachers.length > 0
+      ? dashboardTeachers
+      : Array.isArray(data.teachers)
+        ? data.teachers
+        : []
+
+  const classes =
+    dashboardClasses.length > 0
+      ? dashboardClasses
+      : Array.isArray(data.classes)
+        ? data.classes
+        : []
+
+  const subjects =
+    dashboardSubjects.length > 0
+      ? dashboardSubjects
+      : Array.isArray(data.subjects)
+        ? data.subjects
+        : []
 
   const payments = Array.isArray(data.payments)
     ? data.payments
     : []
 
-  const attendanceRecords = Array.isArray(
-    data.attendance
-  )
+  const attendanceRecords = Array.isArray(data.attendance)
     ? data.attendance
     : []
 
@@ -101,17 +226,55 @@ export default function DashboardPage() {
     ? data.fees
     : []
 
-  // Safe version of the school data used by analytics and charts.
-  const safeData = {
-    ...data,
-    students,
-    teachers,
-    classes,
-    subjects,
-    payments,
-    attendance: attendanceRecords,
-    fees: feesData,
-  }
+  /*
+   * Build the data object used by the dashboard analytics
+   * and charts.
+   */
+  const safeData = useMemo(
+    () => ({
+      ...data,
+      students,
+      teachers,
+      classes,
+      subjects,
+      payments,
+      attendance: attendanceRecords,
+      fees: feesData,
+    }),
+    [
+      data,
+      students,
+      teachers,
+      classes,
+      subjects,
+      payments,
+      attendanceRecords,
+      feesData,
+    ]
+  )
+
+  /*
+   * Dashboard diagnostics.
+   */
+  useEffect(() => {
+    console.log('FINAL DASHBOARD COUNTS:', {
+      students: students.length,
+      teachers: teachers.length,
+      classes: classes.length,
+      subjects: subjects.length,
+      payments: payments.length,
+      attendance: attendanceRecords.length,
+      fees: feesData.length,
+    })
+  }, [
+    students.length,
+    teachers.length,
+    classes.length,
+    subjects.length,
+    payments.length,
+    attendanceRecords.length,
+    feesData.length,
+  ])
 
   const totalStreams = classes.reduce(
     (n, c) =>
@@ -122,8 +285,7 @@ export default function DashboardPage() {
     0
   )
 
-  const attendance =
-    todayAttendanceRate(safeData)
+  const attendance = todayAttendanceRate(safeData)
 
   const fees = feeSummary(safeData)
 
@@ -146,10 +308,35 @@ export default function DashboardPage() {
         description="Here's what's happening across the school today."
       />
 
-      <div className="rounded-lg border-2 border-red-500 bg-red-50 p-4 text-black">
-  <strong>LIVE DATABASE TEST:</strong>{' '}
-  Students={students.length} | Teachers={teachers.length} | Classes={classes.length} | Subjects={subjects.length}
-</div>
+      {/* Live database diagnostic */}
+      <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-4 text-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <strong>LIVE DATABASE:</strong>
+
+          <span>
+            Students={students.length}
+          </span>
+
+          <span>
+            Teachers={teachers.length}
+          </span>
+
+          <span>
+            Classes={classes.length}
+          </span>
+
+          <span>
+            Subjects={subjects.length}
+          </span>
+
+          {dashboardLoading && (
+            <span className="text-sm text-muted-foreground">
+              Loading live data...
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Dashboard statistics */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
