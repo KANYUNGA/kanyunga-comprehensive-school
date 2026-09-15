@@ -457,67 +457,81 @@ export function SchoolProvider({
           ? teachersArray.map(mapTeacher)
           : null
 
-      setData((current) => {
-        const classesToUse =
-          actualClasses ?? current.classes
+     setData((current) => {
+  const classesToUse =
+    actualClasses ?? current.classes
 
-        const actualStudents =
-          mappedStudents !== null
-            ? classesToUse.length > 0
-              ? connectStudentsToClasses(
-                  mappedStudents,
-                  classesToUse
-                )
-              : mappedStudents
-            : current.students
+  const actualStudents =
+    mappedStudents !== null
+      ? classesToUse.length > 0
+        ? connectStudentsToClasses(
+            mappedStudents,
+            classesToUse
+          )
+        : mappedStudents
+      : current.students
 
-        return {
-          ...current,
+  const nextData: SchoolData = {
+    ...current,
 
-          students: actualStudents,
+    students:
+      actualStudents,
 
-          teachers:
-            mappedTeachers !== null
-              ? mappedTeachers
-              : current.teachers,
+    teachers:
+      mappedTeachers !== null
+        ? mappedTeachers
+        : current.teachers,
 
-          classes:
-            actualClasses !== null
-              ? actualClasses
-              : current.classes,
+    classes:
+      actualClasses !== null
+        ? actualClasses
+        : current.classes,
 
-          subjects:
-            subjectsArray !== null
-              ? subjectsArray
-              : current.subjects,
+    subjects:
+      subjectsArray !== null
+        ? subjectsArray
+        : current.subjects,
 
-          exams:
-            examsArray !== null
-              ? examsArray
-              : current.exams,
+    exams:
+      examsArray !== null
+        ? examsArray
+        : current.exams,
 
-          marks:
-            marksArray !== null
-              ? marksArray
-              : current.marks,
+    marks:
+      marksArray !== null
+        ? marksArray
+        : current.marks,
 
-          attendance:
-            attendanceArray !== null
-              ? attendanceArray
-              : current.attendance,
+    attendance:
+      attendanceArray !== null
+        ? attendanceArray
+        : current.attendance,
 
-          payments:
-            paymentsArray !== null
-              ? paymentsArray
-              : current.payments,
+    payments:
+      paymentsArray !== null
+        ? paymentsArray
+        : current.payments,
 
-          fees:
-            feesArray !== null
-              ? feesArray
-              : current.fees,
-        }
-      })
+    fees:
+      feesArray !== null
+        ? feesArray
+        : current.fees,
+  }
 
+  console.log(
+    'FINAL SCHOOL STATE:',
+    {
+      students: nextData.students.length,
+      teachers: nextData.teachers.length,
+      classes: nextData.classes.length,
+      subjects: nextData.subjects.length,
+      payments: nextData.payments.length,
+      fees: nextData.fees.length,
+    }
+  )
+
+  return nextData
+})
       console.log(
         'Database data loaded:',
         {
