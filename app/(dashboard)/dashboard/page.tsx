@@ -1,6 +1,8 @@
+
 'use client'
 
 import Link from 'next/link'
+import { useEffect } from 'react'
 import {
   CreditCard,
   LayoutGrid,
@@ -31,10 +33,32 @@ import { Badge } from '@/components/ui/badge'
 
 import { useSchool } from '@/lib/store'
 import { formatKES, studentName } from '@/lib/data'
-import { feeSummary, todayAttendanceRate } from '@/lib/analytics'
+import {
+  feeSummary,
+  todayAttendanceRate,
+} from '@/lib/analytics'
 
 export default function DashboardPage() {
   const { data } = useSchool()
+
+  /*
+   * TEMPORARY DIAGNOSTIC
+   *
+   * This tells us whether the Dashboard receives
+   * the updated database data after SchoolProvider
+   * finishes loading.
+   */
+  useEffect(() => {
+    console.log('DASHBOARD DATA UPDATED:', {
+      students: data.students?.length ?? 0,
+      teachers: data.teachers?.length ?? 0,
+      classes: data.classes?.length ?? 0,
+      subjects: data.subjects?.length ?? 0,
+      payments: data.payments?.length ?? 0,
+      attendance: data.attendance?.length ?? 0,
+      fees: data.fees?.length ?? 0,
+    })
+  }, [data])
 
   console.log('DASHBOARD DATA:', {
     students: data.students?.length ?? 0,
@@ -47,15 +71,35 @@ export default function DashboardPage() {
   })
 
   // Safely guarantee that all dashboard collections are arrays.
-  const students = Array.isArray(data.students) ? data.students : []
-  const teachers = Array.isArray(data.teachers) ? data.teachers : []
-  const classes = Array.isArray(data.classes) ? data.classes : []
-  const subjects = Array.isArray(data.subjects) ? data.subjects : []
-  const payments = Array.isArray(data.payments) ? data.payments : []
-  const attendanceRecords = Array.isArray(data.attendance)
+  const students = Array.isArray(data.students)
+    ? data.students
+    : []
+
+  const teachers = Array.isArray(data.teachers)
+    ? data.teachers
+    : []
+
+  const classes = Array.isArray(data.classes)
+    ? data.classes
+    : []
+
+  const subjects = Array.isArray(data.subjects)
+    ? data.subjects
+    : []
+
+  const payments = Array.isArray(data.payments)
+    ? data.payments
+    : []
+
+  const attendanceRecords = Array.isArray(
+    data.attendance
+  )
     ? data.attendance
     : []
-  const feesData = Array.isArray(data.fees) ? data.fees : []
+
+  const feesData = Array.isArray(data.fees)
+    ? data.fees
+    : []
 
   // Safe version of the school data used by analytics and charts.
   const safeData = {
@@ -70,20 +114,29 @@ export default function DashboardPage() {
   }
 
   const totalStreams = classes.reduce(
-    (n, c) => n + (Array.isArray(c.streams) ? c.streams.length : 0),
+    (n, c) =>
+      n +
+      (Array.isArray(c.streams)
+        ? c.streams.length
+        : 0),
     0
   )
 
-  const attendance = todayAttendanceRate(safeData)
+  const attendance =
+    todayAttendanceRate(safeData)
 
   const fees = feeSummary(safeData)
 
   const collectionRate = fees.expected
-    ? Math.round((fees.collected / fees.expected) * 100)
+    ? Math.round(
+        (fees.collected / fees.expected) * 100
+      )
     : 0
 
   const recentPayments = [...payments]
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) =>
+      b.date.localeCompare(a.date)
+    )
     .slice(0, 6)
 
   return (
@@ -147,7 +200,9 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Collected</p>
+            <p className="text-sm text-muted-foreground">
+              Collected
+            </p>
 
             <p className="font-heading text-xl font-bold text-emerald-600">
               {formatKES(fees.collected)}
@@ -155,7 +210,9 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Outstanding</p>
+            <p className="text-sm text-muted-foreground">
+              Outstanding
+            </p>
 
             <p className="font-heading text-xl font-bold text-destructive">
               {formatKES(fees.outstanding)}
@@ -176,7 +233,9 @@ export default function DashboardPage() {
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-primary"
-                style={{ width: `${collectionRate}%` }}
+                style={{
+                  width: `${collectionRate}%`,
+                }}
               />
             </div>
           </div>
@@ -191,16 +250,22 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <ClassDistributionChart data={safeData} />
+          <ClassDistributionChart
+            data={safeData}
+          />
         </div>
 
-        <GradeDistributionChart data={safeData} />
+        <GradeDistributionChart
+          data={safeData}
+        />
       </div>
 
       {/* Recent payments */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Fee Payments</CardTitle>
+          <CardTitle>
+            Recent Fee Payments
+          </CardTitle>
 
           <CardDescription>
             Latest transactions recorded in the system
@@ -214,9 +279,11 @@ export default function DashboardPage() {
             </div>
           ) : (
             recentPayments.map((p) => {
-              const student = students.find(
-                (s) => s.id === p.studentId
-              )
+              const student =
+                students.find(
+                  (s) =>
+                    s.id === p.studentId
+                )
 
               const initials = student
                 ? `${student.firstName?.[0] ?? ''}${student.lastName?.[0] ?? ''}`
@@ -241,7 +308,9 @@ export default function DashboardPage() {
 
                       <p className="text-xs text-muted-foreground">
                         {p.reference} ·{' '}
-                        {new Date(p.date).toLocaleDateString(
+                        {new Date(
+                          p.date
+                        ).toLocaleDateString(
                           'en-KE'
                         )}
                       </p>
