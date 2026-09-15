@@ -18,7 +18,18 @@ import { feeSummary, todayAttendanceRate } from '@/lib/analytics'
 
 export default function DashboardPage() {
   const { data } = useSchool()
-  const totalStreams = data.classes.reduce((n, c) => n + c.streams.length, 0)
+
+  console.log('DASHBOARD DATA:', {
+    students: data.students.length,
+    teachers: data.teachers.length,
+    classes: data.classes.length,
+    subjects: data.subjects.length,
+  })
+
+  const totalStreams = data.classes.reduce(
+    (n, c) => n + c.streams.length,
+    0
+  )
   const attendance = todayAttendanceRate(data)
   const fees = feeSummary(data)
   const collectionRate = fees.expected ? Math.round((fees.collected / fees.expected) * 100) : 0
