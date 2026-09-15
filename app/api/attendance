@@ -1,3 +1,4 @@
+
 import { getDb } from "@/lib/db"
 import { requireAdmin } from "@/lib/server-auth"
 
@@ -9,12 +10,14 @@ export async function GET() {
       SELECT
         id,
         student_id,
-        date,
+        attendance_date,
         status,
         remarks,
+        academic_year,
+        term,
         created_at
       FROM attendance
-      ORDER BY date DESC, id DESC
+      ORDER BY attendance_date DESC, id DESC
     `
 
     return Response.json({
@@ -45,11 +48,11 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     const studentId = body.studentId ?? body.student_id
-    const date = body.date
+    const attendanceDate = body.date ?? body.attendance_date
     const status = body.status
     const remarks = body.remarks ?? ""
 
-    if (!studentId || !date || !status) {
+    if (!studentId || !attendanceDate || !status) {
       return Response.json(
         {
           success: false,
@@ -59,25 +62,55 @@ export async function POST(request: Request) {
       )
     }
 
+    // Get the currently active academic term
+    const currentTermResult = await sql`
+      SELECT
+        academic_year,
+        term
+      FROM academic_terms
+      WHERE status = 'Current'
+      ORDER BY academic_year DESC, start_date DESC
+      LIMIT 1
+    `
+
+    if (currentTermResult.length === 0) {
+      return Response.json(
+        {
+          success: false,
+          error: "No current academic term has been configured",
+        },
+        { status: 400 }
+      )
+    }
+
+    const academicYear = currentTermResult[0].academic_year
+    const term = currentTermResult[0].term
+
     const result = await sql`
       INSERT INTO attendance (
         student_id,
-        date,
+        attendance_date,
         status,
-        remarks
+        remarks,
+        academic_year,
+        term
       )
       VALUES (
         ${studentId},
-        ${date},
+        ${attendanceDate},
         ${status},
-        ${remarks}
+        ${remarks},
+        ${academicYear},
+        ${term}
       )
       RETURNING
         id,
         student_id,
-        date,
+        attendance_date,
         status,
         remarks,
+        academic_year,
+        term,
         created_at
     `
 
