@@ -146,6 +146,10 @@ export default function DashboardPage() {
         description="Here's what's happening across the school today."
       />
 
+      <div className="rounded-lg border-2 border-red-500 bg-red-50 p-4 text-black">
+  <strong>LIVE DATABASE TEST:</strong>{' '}
+  Students={students.length} | Teachers={teachers.length} | Classes={classes.length} | Subjects={subjects.length}
+</div>
       {/* Dashboard statistics */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
