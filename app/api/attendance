@@ -1,0 +1,99 @@
+import { getDb } from "@/lib/db"
+import { requireAdmin } from "@/lib/server-auth"
+
+const sql = getDb()
+
+export async function GET() {
+  try {
+    const attendance = await sql`
+      SELECT
+        id,
+        student_id,
+        date,
+        status,
+        remarks,
+        created_at
+      FROM attendance
+      ORDER BY date DESC, id DESC
+    `
+
+    return Response.json({
+      success: true,
+      attendance,
+    })
+  } catch (error) {
+    console.error("Failed to fetch attendance:", error)
+
+    return Response.json(
+      {
+        success: false,
+        error: "Failed to fetch attendance",
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  const auth = await requireAdmin()
+
+  if (!auth.authorized) {
+    return auth.response
+  }
+
+  try {
+    const body = await request.json()
+
+    const studentId = body.studentId ?? body.student_id
+    const date = body.date
+    const status = body.status
+    const remarks = body.remarks ?? ""
+
+    if (!studentId || !date || !status) {
+      return Response.json(
+        {
+          success: false,
+          error: "studentId, date and status are required",
+        },
+        { status: 400 }
+      )
+    }
+
+    const result = await sql`
+      INSERT INTO attendance (
+        student_id,
+        date,
+        status,
+        remarks
+      )
+      VALUES (
+        ${studentId},
+        ${date},
+        ${status},
+        ${remarks}
+      )
+      RETURNING
+        id,
+        student_id,
+        date,
+        status,
+        remarks,
+        created_at
+    `
+
+    return Response.json({
+      success: true,
+      attendance: result[0],
+    })
+  } catch (error) {
+    console.error("Failed to save attendance:", error)
+
+    return Response.json(
+      {
+        success: false,
+        error: "Failed to save attendance",
+      },
+      { status: 500 }
+    )
+  }
+}
