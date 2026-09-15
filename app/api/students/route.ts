@@ -64,17 +64,28 @@ function mapStudent(student: any) {
 }
 
 /* =========================================================
+   ENSURE PHOTO COLUMN EXISTS
+   ========================================================= */
+
+async function ensurePhotoColumn() {
+  await sql`
+    ALTER TABLE students
+    ADD COLUMN IF NOT EXISTS photo_url TEXT
+  `
+}
+
+/* =========================================================
    GET ALL STUDENTS
    ========================================================= */
 
 export async function GET() {
   try {
     /*
-     * Keep this query compatible with the existing students table.
-     *
-     * We intentionally do NOT select email or photo_url here
-     * until we know those columns definitely exist in Neon.
+     * Make sure the database has a place to store
+     * student passport photos.
      */
+    await ensurePhotoColumn()
+
     const students = await sql`
       SELECT
         id,
@@ -91,6 +102,7 @@ export async function GET() {
         address,
         admission_date,
         status,
+        photo_url,
         created_at
       FROM students
       ORDER BY
@@ -99,19 +111,9 @@ export async function GET() {
         id ASC
     `
 
-    /*
-     * Return the same structure expected by the frontend.
-     */
-    const mappedStudents = students.map((student: any) => ({
-      ...mapStudent(student),
-
-      /*
-       * These fields are supplied safely even when the database
-       * does not currently have corresponding columns.
-       */
-      email: "",
-      photoUrl: "",
-    }))
+    const mappedStudents = students.map((student: any) =>
+      mapStudent(student)
+    )
 
     return Response.json({
       success: true,
@@ -146,28 +148,67 @@ export async function POST(request: Request) {
   }
 
   try {
+    /*
+     * Make sure photo_url exists before inserting.
+     */
+    await ensurePhotoColumn()
+
     const body = await request.json()
 
-    const admissionNo = safeString(body.admissionNo).trim()
-    const firstName = safeString(body.firstName).trim()
-    const middleName = safeString(body.middleName).trim()
-    const lastName = safeString(body.lastName).trim()
-    const gender = safeString(body.gender).trim()
+    const admissionNo = safeString(
+      body.admissionNo
+    ).trim()
+
+    const firstName = safeString(
+      body.firstName
+    ).trim()
+
+    const middleName = safeString(
+      body.middleName
+    ).trim()
+
+    const lastName = safeString(
+      body.lastName
+    ).trim()
+
+    const gender = safeString(
+      body.gender
+    ).trim()
+
     const className = safeString(
       body.className ?? body.classId
     ).trim()
-    const stream = safeString(body.stream).trim()
-    const dateOfBirth = safeString(body.dateOfBirth).trim()
-    const guardianName = safeString(body.guardianName).trim()
-    const guardianPhone = safeString(body.guardianPhone).trim()
-    const address = safeString(body.address).trim()
+
+    const stream = safeString(
+      body.stream
+    ).trim()
+
+    const dateOfBirth = safeString(
+      body.dateOfBirth
+    ).trim()
+
+    const guardianName = safeString(
+      body.guardianName
+    ).trim()
+
+    const guardianPhone = safeString(
+      body.guardianPhone
+    ).trim()
+
+    const address = safeString(
+      body.address
+    ).trim()
+
     const admissionDate = safeString(
       body.admissionDate
     ).trim()
+
     const status =
       safeString(body.status).trim() || "Active"
 
-    const photoUrl = safeString(body.photoUrl).trim()
+    const photoUrl = safeString(
+      body.photoUrl
+    ).trim()
 
     if (!admissionNo) {
       return Response.json(
@@ -220,11 +261,7 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Insert using the known existing columns.
-     *
-     * Photo is intentionally not inserted here because the
-     * database schema has not yet been confirmed to contain
-     * photo_url.
+     * Insert student including passport photo.
      */
     const result = await sql`
       INSERT INTO students (
@@ -240,7 +277,8 @@ export async function POST(request: Request) {
         parent_phone,
         address,
         admission_date,
-        status
+        status,
+        photo_url
       )
       VALUES (
         ${admissionNo},
@@ -255,7 +293,8 @@ export async function POST(request: Request) {
         ${guardianPhone},
         ${address},
         ${admissionDate || null},
-        ${status}
+        ${status},
+        ${photoUrl || null}
       )
       RETURNING
         id,
@@ -272,6 +311,7 @@ export async function POST(request: Request) {
         address,
         admission_date,
         status,
+        photo_url,
         created_at
     `
 
@@ -280,16 +320,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         success: true,
-        student: {
-          ...mapStudent(student),
-
-          /*
-           * Preserve the photo in the response if the frontend
-           * supplied one. It will not be permanently stored until
-           * we confirm the database photo column/storage setup.
-           */
-          photoUrl,
-        },
+        student: mapStudent(student),
       },
       { status: 201 }
     )
@@ -308,3 +339,4 @@ export async function POST(request: Request) {
     )
   }
 }
+
