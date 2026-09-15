@@ -68,6 +68,10 @@ type StudentWithPhoto = Student & {
 
 export default function StudentsPage() {
  const { data, deleteStudent, role } = useSchool()
+  console.log("STUDENTS PAGE DATA:", {
+  students: data.students?.length,
+  firstStudent: data.students?.[0],
+})
 
   const [query, setQuery] = useState('')
   const [classFilter, setClassFilter] = useState('all')
