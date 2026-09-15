@@ -369,214 +369,285 @@ export function SchoolProvider({
 }, [])
 
   
-  const loadData = async () => {
-    const fetchApi = async (
-      url: string,
-      property?: string
-    ): Promise<any[] | null> => {
-      try {
-        const response = await fetch(url, {
-          cache: 'no-store',
-        })
+ const loadData = async () => {
+  const fetchApi = async (
+    url: string,
+    property?: string
+  ): Promise<any[] | null> => {
+    try {
+      const response = await fetch(url, {
+        cache: 'no-store',
+      })
 
-        if (!response.ok) {
-          console.error(
-            `${url} returned HTTP ${response.status}`
-          )
-          return null
-        }
-
-        const json = await response.json()
-
-        return getApiArray(json, property)
-      } catch (error) {
+      if (!response.ok) {
         console.error(
-          `Failed to load ${url}:`,
-          error
+          `${url} returned HTTP ${response.status}`
         )
         return null
       }
+
+      const json = await response.json()
+
+      // Some APIs return a direct array.
+      if (Array.isArray(json)) {
+        return json
+      }
+
+      // Other APIs return { students: [...] },
+      // { teachers: [...] }, etc.
+      return getApiArray(json, property)
+    } catch (error) {
+      console.error(`Failed to load ${url}:`, error)
+      return null
     }
-
-    try {
-      const [
-        studentsArray,
-        paymentsArray,
-        feesArray,
-        teachersArray,
-        classesArray,
-        subjectsArray,
-        examsArray,
-        marksArray,
-        attendanceArray,
-      ] = await Promise.all([
-        fetchApi('/api/students', 'students'),
-        fetchApi('/api/payments', 'payments'),
-        fetchApi('/api/fees', 'fees'),
-        fetchApi('/api/teachers', 'teachers'),
-        fetchApi('/api/classes', 'classes'),
-        fetchApi('/api/subjects', 'subjects'),
-        fetchApi('/api/exams', 'exams'),
-        fetchApi('/api/marks', 'marks'),
-        fetchApi('/api/attendance', 'attendance'),
-      ])
-
-      const actualClasses =
-        classesArray !== null
-          ? classesArray.map((cls: any) => ({
-              ...cls,
-
-              id: String(cls.id),
-
-              name:
-                cls.name ??
-                cls.className ??
-                cls.class_name ??
-                '',
-
-              streams:
-                Array.isArray(cls.streams)
-                  ? cls.streams
-                  : cls.stream
-                    ? String(cls.stream)
-                        .split(',')
-                        .map(
-                          (s: string) => s.trim()
-                        )
-                        .filter(Boolean)
-                    : [],
-
-              classTeacherId:
-                cls.classTeacherId ??
-                (cls.class_teacher != null
-                  ? String(cls.class_teacher)
-                  : null),
-            }))
-          : null
-
-      const mappedStudents =
-        studentsArray !== null
-          ? studentsArray.map(mapStudent)
-          : null
-
-      const mappedTeachers =
-        teachersArray !== null
-          ? teachersArray.map(mapTeacher)
-          : null
-
-     setData((current) => {
-  const classesToUse =
-    actualClasses ?? current.classes
-
-  const actualStudents =
-    mappedStudents !== null
-      ? classesToUse.length > 0
-        ? connectStudentsToClasses(
-            mappedStudents,
-            classesToUse
-          )
-        : mappedStudents
-      : current.students
-
-  const nextData: SchoolData = {
-    ...current,
-
-    students:
-      actualStudents,
-
-    teachers:
-      mappedTeachers !== null
-        ? mappedTeachers
-        : current.teachers,
-
-    classes:
-      actualClasses !== null
-        ? actualClasses
-        : current.classes,
-
-    subjects:
-      subjectsArray !== null
-        ? subjectsArray
-        : current.subjects,
-
-    exams:
-      examsArray !== null
-        ? examsArray
-        : current.exams,
-
-    marks:
-      marksArray !== null
-        ? marksArray
-        : current.marks,
-
-    attendance:
-      attendanceArray !== null
-        ? attendanceArray
-        : current.attendance,
-
-    payments:
-      paymentsArray !== null
-        ? paymentsArray
-        : current.payments,
-
-    fees:
-      feesArray !== null
-        ? feesArray
-        : current.fees,
   }
 
-  console.log(
-    'FINAL SCHOOL STATE:',
-    {
-      students: nextData.students.length,
-      teachers: nextData.teachers.length,
-      classes: nextData.classes.length,
-      subjects: nextData.subjects.length,
-      payments: nextData.payments.length,
-      fees: nextData.fees.length,
+  try {
+    /*
+     * Load students independently.
+     * Students are the most important dataset for
+     * the Students page.
+     */
+    const studentsArray = await fetchApi(
+      '/api/students',
+      'students'
+    )
+
+    /*
+     * Load the remaining datasets independently.
+     * A failure in one API must not prevent students
+     * from appearing.
+     */
+    const [
+      paymentsArray,
+      feesArray,
+      teachersArray,
+      classesArray,
+      subjectsArray,
+      examsArray,
+      marksArray,
+      attendanceArray,
+    ] = await Promise.all([
+      fetchApi('/api/payments', 'payments'),
+      fetchApi('/api/fees', 'fees'),
+      fetchApi('/api/teachers', 'teachers'),
+      fetchApi('/api/classes', 'classes'),
+      fetchApi('/api/subjects', 'subjects'),
+      fetchApi('/api/exams', 'exams'),
+      fetchApi('/api/marks', 'marks'),
+      fetchApi('/api/attendance', 'attendance'),
+    ])
+
+    /*
+     * Normalize classes.
+     */
+    const actualClasses =
+      classesArray !== null
+        ? classesArray.map((cls: any) => ({
+            ...cls,
+
+            id: String(cls.id),
+
+            name:
+              cls.name ??
+              cls.className ??
+              cls.class_name ??
+              '',
+
+            streams:
+              Array.isArray(cls.streams)
+                ? cls.streams
+                : cls.stream
+                  ? String(cls.stream)
+                      .split(',')
+                      .map((s: string) => s.trim())
+                      .filter(Boolean)
+                  : [],
+
+            classTeacherId:
+              cls.classTeacherId ??
+              (cls.class_teacher != null
+                ? String(cls.class_teacher)
+                : null),
+          }))
+        : null
+
+    /*
+     * Map students.
+     */
+    let mappedStudents: Student[] | null = null
+
+    if (studentsArray !== null) {
+      try {
+        mappedStudents = studentsArray.map(mapStudent)
+
+        console.log(
+          'STUDENTS API LOADED:',
+          mappedStudents.length
+        )
+      } catch (error) {
+        console.error(
+          'Failed to map students:',
+          error
+        )
+
+        mappedStudents = null
+      }
     }
-  )
 
-  return nextData
-})
+    /*
+     * Map teachers.
+     */
+    let mappedTeachers: Teacher[] | null = null
+
+    if (teachersArray !== null) {
+      try {
+        mappedTeachers = teachersArray.map(mapTeacher)
+      } catch (error) {
+        console.error(
+          'Failed to map teachers:',
+          error
+        )
+
+        mappedTeachers = null
+      }
+    }
+
+    /*
+     * Update the school state.
+     *
+     * IMPORTANT:
+     * If an API fails, keep the existing data instead
+     * of replacing it with an empty array.
+     */
+    setData((current) => {
+      const classesToUse =
+        actualClasses ?? current.classes
+
+      let actualStudents = current.students
+
+      if (mappedStudents !== null) {
+        try {
+          actualStudents =
+            classesToUse.length > 0
+              ? connectStudentsToClasses(
+                  mappedStudents,
+                  classesToUse
+                )
+              : mappedStudents
+        } catch (error) {
+          console.error(
+            'Failed to connect students to classes:',
+            error
+          )
+
+          /*
+           * Even if class matching fails, NEVER
+           * throw away the students.
+           */
+          actualStudents = mappedStudents
+        }
+      }
+
+      const nextData: SchoolData = {
+        ...current,
+
+        students: actualStudents,
+
+        teachers:
+          mappedTeachers !== null
+            ? mappedTeachers
+            : current.teachers,
+
+        classes:
+          actualClasses !== null
+            ? actualClasses
+            : current.classes,
+
+        subjects:
+          subjectsArray !== null
+            ? subjectsArray
+            : current.subjects,
+
+        exams:
+          examsArray !== null
+            ? examsArray
+            : current.exams,
+
+        marks:
+          marksArray !== null
+            ? marksArray
+            : current.marks,
+
+        attendance:
+          attendanceArray !== null
+            ? attendanceArray
+            : current.attendance,
+
+        payments:
+          paymentsArray !== null
+            ? paymentsArray
+            : current.payments,
+
+        fees:
+          feesArray !== null
+            ? feesArray
+            : current.fees,
+      }
+
       console.log(
-        'Database data loaded:',
+        'FINAL SCHOOL STATE:',
         {
-          students:
-            studentsArray?.length ?? 'FAILED',
-
-          teachers:
-            teachersArray?.length ?? 'FAILED',
-
-          classes:
-            classesArray?.length ?? 'FAILED',
-
-          subjects:
-            subjectsArray?.length ?? 'FAILED',
-
-          exams:
-            examsArray?.length ?? 'FAILED',
-
-          marks:
-            marksArray?.length ?? 'FAILED',
-
-          attendance:
-            attendanceArray?.length ?? 'FAILED',
-
-          payments:
-            paymentsArray?.length ?? 'FAILED',
-
-          fees:
-            feesArray?.length ?? 'FAILED',
+          students: nextData.students.length,
+          teachers: nextData.teachers.length,
+          classes: nextData.classes.length,
+          subjects: nextData.subjects.length,
+          payments: nextData.payments.length,
+          fees: nextData.fees.length,
         }
       )
-    } catch (error) {
-      console.error(
-        'Failed to load school data:',
-        error
-      )
-    }
+
+      return nextData
+    })
+
+    console.log(
+      'DATABASE DATA LOADED:',
+      {
+        students:
+          studentsArray?.length ?? 'FAILED',
+
+        teachers:
+          teachersArray?.length ?? 'FAILED',
+
+        classes:
+          classesArray?.length ?? 'FAILED',
+
+        subjects:
+          subjectsArray?.length ?? 'FAILED',
+
+        exams:
+          examsArray?.length ?? 'FAILED',
+
+        marks:
+          marksArray?.length ?? 'FAILED',
+
+        attendance:
+          attendanceArray?.length ?? 'FAILED',
+
+        payments:
+          paymentsArray?.length ?? 'FAILED',
+
+        fees:
+          feesArray?.length ?? 'FAILED',
       }
+    )
+  } catch (error) {
+    console.error(
+      'Failed to load school data:',
+      error
+    )
+  }
+}
   useEffect(() => {
     loadData()
 
