@@ -207,10 +207,17 @@ export function ReportCard({
     >
       {/* SCHOOL HEADER */}
       <div className="mb-5 border-b-2 pb-4 text-center">
-        <h1 className="text-2xl font-bold tracking-wide">
-          KANYUNGA COMPREHENSIVE SCHOOL
-        </h1>
+       <div className="mb-3 flex justify-center">
+  <img
+    src="/school-logo.jpg"
+    alt="Kanyunga Comprehensive School Logo"
+    className="h-24 w-24 object-contain"
+  />
+</div>
 
+<h1 className="text-2xl font-bold tracking-wide">
+  KANYUNGA COMPREHENSIVE SCHOOL
+</h1>
         <p className="mt-1 text-lg font-semibold">
           STUDENT ACADEMIC REPORT
         </p>
