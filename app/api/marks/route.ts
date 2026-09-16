@@ -6,10 +6,13 @@ const sql = getDb()
 function mapMark(mark: any) {
   return {
     id: String(mark.id),
-    examId: mark.legacy_exam_id ?? String(mark.exam_id),
+    examId:
+      mark.legacy_exam_id ??
+      String(mark.exam_id),
     studentId: String(mark.student_id),
     subjectId:
-      mark.legacy_subject_id ?? String(mark.subject_id),
+      mark.legacy_subject_id ??
+      String(mark.subject_id),
     score: Number(mark.marks ?? 0),
   }
 }
@@ -26,10 +29,14 @@ async function resolveExamId(examId: string) {
   return result[0]?.id ?? null
 }
 
-async function resolveSubjectId(subjectId: string) {
+async function resolveSubjectId(
+  subjectId: string,
+) {
   const numericId = Number(subjectId)
 
-  const result = Number.isInteger(numericId)
+  const result = Number.isInteger(
+    numericId,
+  )
     ? await sql`
         SELECT id
         FROM subjects
@@ -47,7 +54,9 @@ async function resolveSubjectId(subjectId: string) {
   return result[0]?.id ?? null
 }
 
-async function resolveStudentId(studentId: string) {
+async function resolveStudentId(
+  studentId: string,
+) {
   const numericId = Number(studentId)
 
   if (!Number.isInteger(numericId)) {
@@ -64,7 +73,9 @@ async function resolveStudentId(studentId: string) {
   return result[0]?.id ?? null
 }
 
-async function getTeacherIdForUser(userId: number) {
+async function getTeacherIdForUser(
+  userId: number,
+) {
   const result = await sql`
     SELECT teacher_id
     FROM users
@@ -75,7 +86,9 @@ async function getTeacherIdForUser(userId: number) {
   return result[0]?.teacher_id ?? null
 }
 
-async function getStudentClass(studentId: number) {
+async function getStudentClass(
+  studentId: number,
+) {
   const result = await sql`
     SELECT
       s.id,
@@ -98,7 +111,8 @@ async function teacherCanEnterMarks(
   studentId: number,
   subjectId: number,
 ) {
-  const student = await getStudentClass(studentId)
+  const student =
+    await getStudentClass(studentId)
 
   if (!student) {
     return {
@@ -152,13 +166,14 @@ async function teacherCanEnterMarks(
     if (classTeacher.length > 0) {
       return {
         allowed: true,
-        reason: "Class teacher of own class.",
+        reason:
+          "Class teacher of own class.",
       }
     }
   }
 
   /*
-   * Grades 4–9 and any other classes:
+   * Grades 4–9 and other classes:
    * teacher must have an explicit
    * teacher + subject + class assignment.
    */
@@ -174,7 +189,8 @@ async function teacherCanEnterMarks(
   if (assignment.length > 0) {
     return {
       allowed: true,
-      reason: "Assigned subject teacher.",
+      reason:
+        "Assigned subject teacher.",
     }
   }
 
@@ -185,8 +201,248 @@ async function teacherCanEnterMarks(
   }
 }
 
-export async function GET() {
+/* =========================================================
+   GET MARKS
+   ========================================================= */
+
+export async function GET(
+  request: Request,
+) {
   try {
+    const { searchParams } =
+      new URL(request.url)
+
+    const examId =
+      searchParams.get("examId")
+
+    const classId =
+      searchParams.get("classId")
+
+    const subjectId =
+      searchParams.get("subjectId")
+
+    /*
+     * IMPORTANT:
+     *
+     * If an exam is supplied, only retrieve
+     * marks for that exam.
+     *
+     * This prevents the Marks page from
+     * downloading the entire marks table.
+     */
+
+    if (examId) {
+      const databaseExamId =
+        await resolveExamId(examId)
+
+      if (databaseExamId === null) {
+        return Response.json(
+          {
+            error:
+              `Exam not found: ${examId}`,
+          },
+          {
+            status: 404,
+          },
+        )
+      }
+
+      /*
+       * Optional subject filter.
+       */
+      if (subjectId) {
+        const databaseSubjectId =
+          await resolveSubjectId(
+            subjectId,
+          )
+
+        if (
+          databaseSubjectId === null
+        ) {
+          return Response.json(
+            {
+              error:
+                `Subject not found: ${subjectId}`,
+            },
+            {
+              status: 404,
+            },
+          )
+        }
+
+        /*
+         * Optional class filter.
+         *
+         * Student class is matched using
+         * the student's class_name.
+         */
+        if (classId) {
+          const numericClassId =
+            Number(classId)
+
+          if (
+            !Number.isInteger(
+              numericClassId,
+            )
+          ) {
+            return Response.json(
+              {
+                error:
+                  "Invalid class ID.",
+              },
+              {
+                status: 400,
+              },
+            )
+          }
+
+          const marks =
+            await sql`
+              SELECT
+                m.id,
+                m.student_id,
+                m.exam_id,
+                m.subject_id,
+                m.marks,
+                e.legacy_id AS legacy_exam_id,
+                s.legacy_id AS legacy_subject_id
+              FROM marks m
+              LEFT JOIN exams e
+                ON e.id = m.exam_id
+              LEFT JOIN subjects s
+                ON s.id = m.subject_id
+              INNER JOIN students st
+                ON st.id = m.student_id
+              INNER JOIN classes c
+                ON LOWER(TRIM(c.class_name)) =
+                   LOWER(TRIM(st.class_name))
+              WHERE m.exam_id = ${databaseExamId}
+                AND m.subject_id = ${databaseSubjectId}
+                AND c.id = ${numericClassId}
+              ORDER BY st.first_name, st.last_name
+            `
+
+          return Response.json(
+            marks.map(mapMark),
+          )
+        }
+
+        const marks =
+          await sql`
+            SELECT
+              m.id,
+              m.student_id,
+              m.exam_id,
+              m.subject_id,
+              m.marks,
+              e.legacy_id AS legacy_exam_id,
+              s.legacy_id AS legacy_subject_id
+            FROM marks m
+            LEFT JOIN exams e
+              ON e.id = m.exam_id
+            LEFT JOIN subjects s
+              ON s.id = m.subject_id
+            WHERE m.exam_id = ${databaseExamId}
+              AND m.subject_id = ${databaseSubjectId}
+            ORDER BY m.id
+          `
+
+        return Response.json(
+          marks.map(mapMark),
+        )
+      }
+
+      /*
+       * Exam supplied but no subject.
+       *
+       * This is what we want for the
+       * Past Results table.
+       */
+      if (classId) {
+        const numericClassId =
+          Number(classId)
+
+        if (
+          !Number.isInteger(
+            numericClassId,
+          )
+        ) {
+          return Response.json(
+            {
+              error:
+                "Invalid class ID.",
+            },
+            {
+              status: 400,
+            },
+          )
+        }
+
+        const marks =
+          await sql`
+            SELECT
+              m.id,
+              m.student_id,
+              m.exam_id,
+              m.subject_id,
+              m.marks,
+              e.legacy_id AS legacy_exam_id,
+              s.legacy_id AS legacy_subject_id
+            FROM marks m
+            LEFT JOIN exams e
+              ON e.id = m.exam_id
+            LEFT JOIN subjects s
+              ON s.id = m.subject_id
+            INNER JOIN students st
+              ON st.id = m.student_id
+            INNER JOIN classes c
+              ON LOWER(TRIM(c.class_name)) =
+                 LOWER(TRIM(st.class_name))
+            WHERE m.exam_id = ${databaseExamId}
+              AND c.id = ${numericClassId}
+            ORDER BY st.first_name, st.last_name
+          `
+
+        return Response.json(
+          marks.map(mapMark),
+        )
+      }
+
+      /*
+       * Exam only.
+       */
+      const marks =
+        await sql`
+          SELECT
+            m.id,
+            m.student_id,
+            m.exam_id,
+            m.subject_id,
+            m.marks,
+            e.legacy_id AS legacy_exam_id,
+            s.legacy_id AS legacy_subject_id
+          FROM marks m
+          LEFT JOIN exams e
+            ON e.id = m.exam_id
+          LEFT JOIN subjects s
+            ON s.id = m.subject_id
+          WHERE m.exam_id = ${databaseExamId}
+          ORDER BY m.id
+        `
+
+      return Response.json(
+        marks.map(mapMark),
+      )
+    }
+
+    /*
+     * Backward compatibility:
+     *
+     * If no examId is supplied, return all marks.
+     *
+     * This means other parts of the application
+     * will not immediately break.
+     */
     const marks = await sql`
       SELECT
         m.id,
@@ -215,7 +471,8 @@ export async function GET() {
 
     return Response.json(
       {
-        error: "Failed to fetch marks",
+        error:
+          "Failed to fetch marks",
       },
       {
         status: 500,
@@ -224,11 +481,16 @@ export async function GET() {
   }
 }
 
+/* =========================================================
+   POST MARKS
+   ========================================================= */
+
 export async function POST(
   request: Request,
 ) {
   try {
-    const user = await getCurrentUser()
+    const user =
+      await getCurrentUser()
 
     if (!user) {
       return Response.json(
@@ -251,7 +513,8 @@ export async function POST(
     const isAdmin =
       userRole === "admin"
 
-    let teacherId: number | null = null
+    let teacherId: number | null =
+      null
 
     if (!isAdmin) {
       if (userRole !== "teacher") {
@@ -279,7 +542,9 @@ export async function POST(
       }
 
       const linkedTeacherId =
-        await getTeacherIdForUser(userId)
+        await getTeacherIdForUser(
+          userId,
+        )
 
       if (!linkedTeacherId) {
         return Response.json(
@@ -293,16 +558,16 @@ export async function POST(
         )
       }
 
-      teacherId = Number(
-        linkedTeacherId,
-      )
+      teacherId =
+        Number(linkedTeacherId)
 
-      const teacherResult = await sql`
-        SELECT id, status
-        FROM teachers
-        WHERE id = ${teacherId}
-        LIMIT 1
-      `
+      const teacherResult =
+        await sql`
+          SELECT id, status
+          FROM teachers
+          WHERE id = ${teacherId}
+          LIMIT 1
+        `
 
       const teacher =
         teacherResult[0]
@@ -337,17 +602,36 @@ export async function POST(
       }
     }
 
-    const body = await request.json()
+    const body =
+      await request.json()
 
     const examId = String(
       body.examId ?? "",
     )
 
+    /*
+     * Accept both:
+     *
+     * {
+     *   entries: [...]
+     * }
+     *
+     * and
+     *
+     * {
+     *   marks: [...]
+     * }
+     *
+     * This makes the API compatible with
+     * the Marks page.
+     */
     const entries = Array.isArray(
       body.entries,
     )
       ? body.entries
-      : []
+      : Array.isArray(body.marks)
+        ? body.marks
+        : []
 
     if (!examId) {
       return Response.json(
@@ -376,7 +660,9 @@ export async function POST(
     const databaseExamId =
       await resolveExamId(examId)
 
-    if (databaseExamId === null) {
+    if (
+      databaseExamId === null
+    ) {
       return Response.json(
         {
           error:
@@ -389,9 +675,8 @@ export async function POST(
     }
 
     /*
-     * First validate every entry.
-     * Nothing is written until all permissions
-     * have been checked.
+     * Validate everything before writing
+     * anything to the database.
      */
     const validatedEntries: Array<{
       studentId: number
@@ -400,13 +685,15 @@ export async function POST(
     }> = []
 
     for (const entry of entries) {
-      const studentId = String(
-        entry.studentId ?? "",
-      )
+      const studentId =
+        String(
+          entry.studentId ?? "",
+        )
 
-      const subjectId = String(
-        entry.subjectId ?? "",
-      )
+      const subjectId =
+        String(
+          entry.subjectId ?? "",
+        )
 
       const score = Number(
         entry.score,
@@ -479,10 +766,11 @@ export async function POST(
         }
       }
 
-      const safeScore = Math.max(
-        0,
-        Math.min(100, score),
-      )
+      const safeScore =
+        Math.max(
+          0,
+          Math.min(100, score),
+        )
 
       validatedEntries.push({
         studentId:
@@ -508,18 +796,21 @@ export async function POST(
     }
 
     /*
-     * Save marks only after every entry
-     * has passed the permission check.
+     * Save marks.
+     *
+     * Existing marks are updated.
+     * New marks are inserted.
      */
     for (const entry of validatedEntries) {
-      const existing = await sql`
-        SELECT id
-        FROM marks
-        WHERE student_id = ${entry.studentId}
-          AND exam_id = ${databaseExamId}
-          AND subject_id = ${entry.subjectId}
-        LIMIT 1
-      `
+      const existing =
+        await sql`
+          SELECT id
+          FROM marks
+          WHERE student_id = ${entry.studentId}
+            AND exam_id = ${databaseExamId}
+            AND subject_id = ${entry.subjectId}
+          LIMIT 1
+        `
 
       if (existing.length > 0) {
         await sql`
@@ -548,9 +839,10 @@ export async function POST(
     return Response.json(
       {
         success: true,
-        message: isAdmin
-          ? "Marks saved successfully."
-          : "Marks saved successfully.",
+        message:
+          "Marks saved successfully.",
+        saved:
+          validatedEntries.length,
       },
       {
         status: 200,
