@@ -10,7 +10,12 @@ import {
 
 import { useSchool } from "@/lib/store"
 import { PageHeader } from "@/components/page-header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
 type Student = {
@@ -106,12 +111,68 @@ export default function MarksPage() {
   const [scores, setScores] = useState<Record<string, number | "">>({})
 
   const [loading, setLoading] = useState(true)
+  const [marksLoading, setMarksLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [message, setMessage] = useState("")
-  const [messageType, setMessageType] = useState<"success" | "error">(
-    "success"
-  )
+  const [messageType, setMessageType] = useState<
+    "success" | "error"
+  >("success")
+
+  /*
+   * =========================================================
+   * NORMALIZE API DATA
+   * =========================================================
+   */
+
+  function normalize(value: unknown) {
+    return String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+  }
+
+  function parseArray(json: any, key: string) {
+    if (Array.isArray(json)) {
+      return json
+    }
+
+    return json?.[key] ?? json?.data ?? []
+  }
+
+  function mapMarksData(data: any): Mark[] {
+    const marksData = parseArray(data, "marks")
+
+    return marksData.map((item: any) => ({
+      id:
+        item.id != null
+          ? Number(item.id)
+          : undefined,
+      examId: Number(
+        item.examId ?? item.exam_id
+      ),
+      studentId: Number(
+        item.studentId ?? item.student_id
+      ),
+      subjectId: Number(
+        item.subjectId ?? item.subject_id
+      ),
+      score: Number(
+        item.score ?? item.marks ?? 0
+      ),
+    }))
+  }
+
+  /*
+   * =========================================================
+   * LOAD MAIN PAGE DATA
+   *
+   * IMPORTANT:
+   * Marks are deliberately NOT loaded here.
+   * They are loaded separately according to the
+   * selected exam/class.
+   * =========================================================
+   */
 
   async function loadData() {
     try {
@@ -123,7 +184,6 @@ export default function MarksPage() {
         classesRes,
         subjectsRes,
         examsRes,
-        marksRes,
         assignmentsRes,
         teachersRes,
       ] = await Promise.all([
@@ -131,7 +191,6 @@ export default function MarksPage() {
         fetch("/api/classes"),
         fetch("/api/subjects"),
         fetch("/api/exams"),
-        fetch("/api/marks"),
         fetch("/api/teacher-subject-assignments"),
         fetch("/api/teachers"),
       ])
@@ -156,41 +215,44 @@ export default function MarksPage() {
       const classesJson = await classesRes.json()
       const subjectsJson = await subjectsRes.json()
       const examsJson = await examsRes.json()
-      const marksJson = marksRes.ok ? await marksRes.json() : []
+
       const assignmentsJson = assignmentsRes.ok
         ? await assignmentsRes.json()
         : []
+
       const teachersJson = teachersRes.ok
         ? await teachersRes.json()
         : []
 
-      const studentsData = Array.isArray(studentsJson)
-        ? studentsJson
-        : studentsJson.students ?? studentsJson.data ?? []
+      const studentsData = parseArray(
+        studentsJson,
+        "students"
+      )
 
-      const classesData = Array.isArray(classesJson)
-        ? classesJson
-        : classesJson.classes ?? classesJson.data ?? []
+      const classesData = parseArray(
+        classesJson,
+        "classes"
+      )
 
-      const subjectsData = Array.isArray(subjectsJson)
-        ? subjectsJson
-        : subjectsJson.subjects ?? subjectsJson.data ?? []
+      const subjectsData = parseArray(
+        subjectsJson,
+        "subjects"
+      )
 
-      const examsData = Array.isArray(examsJson)
-        ? examsJson
-        : examsJson.exams ?? examsJson.data ?? []
+      const examsData = parseArray(
+        examsJson,
+        "exams"
+      )
 
-      const marksData = Array.isArray(marksJson)
-        ? marksJson
-        : marksJson.marks ?? marksJson.data ?? []
+      const assignmentsData = parseArray(
+        assignmentsJson,
+        "assignments"
+      )
 
-      const assignmentsData = Array.isArray(assignmentsJson)
-        ? assignmentsJson
-        : assignmentsJson.assignments ?? assignmentsJson.data ?? []
-
-      const teachersData = Array.isArray(teachersJson)
-        ? teachersJson
-        : teachersJson.teachers ?? teachersJson.data ?? []
+      const teachersData = parseArray(
+        teachersJson,
+        "teachers"
+      )
 
       setStudents(
         studentsData.map((student: any) => ({
@@ -201,11 +263,19 @@ export default function MarksPage() {
               student.admissionNumber ??
               ""
           ),
-          firstName: String(student.firstName ?? student.first_name ?? ""),
+          firstName: String(
+            student.firstName ??
+              student.first_name ??
+              ""
+          ),
           middleName:
-            student.middleName ?? student.middle_name ?? "",
+            student.middleName ??
+            student.middle_name ??
+            "",
           lastName:
-            student.lastName ?? student.last_name ?? "",
+            student.lastName ??
+            student.last_name ??
+            "",
           classId:
             student.classId != null
               ? Number(student.classId)
@@ -217,7 +287,8 @@ export default function MarksPage() {
             student.class_name ??
             "",
           stream: student.stream ?? "",
-          status: student.status ?? "Active",
+          status:
+            student.status ?? "Active",
         }))
       )
 
@@ -235,7 +306,9 @@ export default function MarksPage() {
             item.classTeacherId != null
               ? Number(item.classTeacherId)
               : item.class_teacher_id != null
-                ? Number(item.class_teacher_id)
+                ? Number(
+                    item.class_teacher_id
+                  )
                 : undefined,
         }))
       )
@@ -243,9 +316,12 @@ export default function MarksPage() {
       setSubjects(
         subjectsData.map((item: any) => ({
           id: Number(item.id),
-          name: String(item.name ?? ""),
+          name: String(
+            item.name ?? ""
+          ),
           code: item.code ?? "",
-          category: item.category ?? "",
+          category:
+            item.category ?? "",
         }))
       )
 
@@ -272,79 +348,70 @@ export default function MarksPage() {
         }))
       )
 
-      setMarks(
-        marksData.map((item: any) => ({
-          id:
-            item.id != null
-              ? Number(item.id)
-              : undefined,
-          examId: Number(
-            item.examId ?? item.exam_id
-          ),
-          studentId: Number(
-            item.studentId ?? item.student_id
-          ),
-          subjectId: Number(
-            item.subjectId ?? item.subject_id
-          ),
-          score: Number(
-            item.score ?? item.marks ?? 0
-          ),
-        }))
-      )
-
       setAssignments(
-        assignmentsData.map((item: any) => ({
-          assignment_id: Number(
-            item.assignment_id ?? item.id
-          ),
-          teacher_id: Number(
-            item.teacher_id ?? item.teacherId
-          ),
-          subject_id: Number(
-            item.subject_id ?? item.subjectId
-          ),
-          subject_name: String(
-            item.subject_name ??
-              item.subjectName ??
-              ""
-          ),
-          subject_code:
-            item.subject_code ??
-            item.subjectCode ??
-            "",
-          class_id: Number(
-            item.class_id ?? item.classId
-          ),
-          class_name: String(
-            item.class_name ??
-              item.className ??
-              ""
-          ),
-        }))
+        assignmentsData.map(
+          (item: any) => ({
+            assignment_id: Number(
+              item.assignment_id ??
+                item.id
+            ),
+            teacher_id: Number(
+              item.teacher_id ??
+                item.teacherId
+            ),
+            subject_id: Number(
+              item.subject_id ??
+                item.subjectId
+            ),
+            subject_name: String(
+              item.subject_name ??
+                item.subjectName ??
+                ""
+            ),
+            subject_code:
+              item.subject_code ??
+              item.subjectCode ??
+              "",
+            class_id: Number(
+              item.class_id ??
+                item.classId
+            ),
+            class_name: String(
+              item.class_name ??
+                item.className ??
+                ""
+            ),
+          })
+        )
       )
 
       setTeachers(
-        teachersData.map((item: any) => ({
-          id: Number(item.id),
-          firstName:
-            item.firstName ??
-            item.first_name ??
-            "",
-          middleName:
-            item.middleName ??
-            item.middle_name ??
-            "",
-          lastName:
-            item.lastName ??
-            item.last_name ??
-            "",
-          name: item.name ?? "",
-          email: item.email ?? "",
-        }))
+        teachersData.map(
+          (item: any) => ({
+            id: Number(item.id),
+            firstName:
+              item.firstName ??
+              item.first_name ??
+              "",
+            middleName:
+              item.middleName ??
+              item.middle_name ??
+              "",
+            lastName:
+              item.lastName ??
+              item.last_name ??
+              "",
+            name: item.name ?? "",
+            email:
+              item.email ?? "",
+          })
+        )
       )
     } catch (error) {
-      console.error("Failed to load marks data:", error)
+      console.error(
+        "Failed to load marks page data:",
+        error
+      )
 
       setMessage(
         error instanceof Error
@@ -358,35 +425,132 @@ export default function MarksPage() {
     }
   }
 
+  /*
+   * =========================================================
+   * LOAD ONLY MARKS FOR SELECTED EXAM + CLASS
+   * =========================================================
+   */
+
+  async function loadMarks() {
+    if (!selectedExam) {
+      setMarks([])
+      return
+    }
+
+    try {
+      setMarksLoading(true)
+
+      const params =
+        new URLSearchParams()
+
+      params.set(
+        "examId",
+        selectedExam
+      )
+
+      if (selectedClass) {
+        params.set(
+          "classId",
+          selectedClass
+        )
+      }
+
+      const response =
+        await fetch(
+          `/api/marks?${params.toString()}`,
+          {
+            cache: "no-store",
+          }
+        )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Failed to load marks"
+        )
+      }
+
+      setMarks(
+        mapMarksData(data)
+      )
+    } catch (error) {
+      console.error(
+        "Failed to load selected marks:",
+        error
+      )
+
+      setMarks([])
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load marks"
+      )
+
+      setMessageType("error")
+    } finally {
+      setMarksLoading(false)
+    }
+  }
+
+  /*
+   * Initial page load.
+   */
   useEffect(() => {
     loadData()
   }, [])
 
+  /*
+   * Load only the marks needed for the
+   * selected exam/class.
+   */
+  useEffect(() => {
+    if (!loading) {
+      loadMarks()
+    }
+  }, [
+    selectedExam,
+    selectedClass,
+    loading,
+  ])
+
+  /*
+   * =========================================================
+   * CLASS DATA
+   * =========================================================
+   */
+
   const classes = useMemo(() => {
-    return [...schoolClasses].sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, {
-        numeric: true,
-        sensitivity: "base",
-      })
+    return [...schoolClasses].sort(
+      (a, b) =>
+        a.name.localeCompare(
+          b.name,
+          undefined,
+          {
+            numeric: true,
+            sensitivity: "base",
+          }
+        )
     )
   }, [schoolClasses])
 
-  function normalize(value: unknown) {
-    return String(value ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-  }
-
-  function getStudentClassName(student: Student) {
+  function getStudentClassName(
+    student: Student
+  ) {
     if (student.className) {
       return student.className
     }
 
     if (student.classId != null) {
-      const found = schoolClasses.find(
-        (item) => item.id === student.classId
-      )
+      const found =
+        schoolClasses.find(
+          (item) =>
+            item.id ===
+            student.classId
+        )
 
       if (found) {
         return found.name
@@ -401,21 +565,28 @@ export default function MarksPage() {
       return []
     }
 
-    const selectedClassObject = schoolClasses.find(
-      (item) => String(item.id) === selectedClass
-    )
+    const selectedClassObject =
+      schoolClasses.find(
+        (item) =>
+          String(item.id) ===
+          selectedClass
+      )
 
     if (!selectedClassObject) {
       return []
     }
 
-    const selectedClassName = normalize(
-      selectedClassObject.name
-    )
+    const selectedClassName =
+      normalize(
+        selectedClassObject.name
+      )
 
     return students
       .filter((student) => {
-        const status = normalize(student.status)
+        const status =
+          normalize(
+            student.status
+          )
 
         if (
           status &&
@@ -425,17 +596,32 @@ export default function MarksPage() {
           return false
         }
 
-        const studentClassName = normalize(
-          getStudentClassName(student)
-        )
+        const studentClassName =
+          normalize(
+            getStudentClassName(
+              student
+            )
+          )
 
-        return studentClassName === selectedClassName
+        return (
+          studentClassName ===
+          selectedClassName
+        )
       })
       .sort((a, b) => {
-        const nameA = `${a.firstName} ${a.lastName ?? ""}`
-        const nameB = `${b.firstName} ${b.lastName ?? ""}`
+        const nameA =
+          `${a.firstName} ${
+            a.lastName ?? ""
+          }`
 
-        return nameA.localeCompare(nameB)
+        const nameB =
+          `${b.firstName} ${
+            b.lastName ?? ""
+          }`
+
+        return nameA.localeCompare(
+          nameB
+        )
       })
   }, [
     students,
@@ -443,133 +629,193 @@ export default function MarksPage() {
     selectedClass,
   ])
 
-  const currentTeacher = useMemo(() => {
-    if (!isTeacher || !currentUser) {
-      return null
-    }
+  /*
+   * =========================================================
+   * CURRENT TEACHER
+   * =========================================================
+   */
 
-    const userEmail = normalize(
-      (currentUser as any)?.email
-    )
+  const currentTeacher =
+    useMemo(() => {
+      if (
+        !isTeacher ||
+        !currentUser
+      ) {
+        return null
+      }
 
-    const userName = normalize(
-      (currentUser as any)?.name ??
-        (currentUser as any)?.fullName ??
-        ""
-    )
-
-    return (
-      teachers.find((teacher) => {
-        const teacherEmail = normalize(
-          teacher.email
+      const userEmail =
+        normalize(
+          (currentUser as any)
+            ?.email
         )
 
-        const teacherName = normalize(
-          teacher.name ??
-            `${teacher.firstName ?? ""} ${
-              teacher.lastName ?? ""
-            }`
+      const userName =
+        normalize(
+          (currentUser as any)
+            ?.name ??
+            (currentUser as any)
+              ?.fullName ??
+            ""
         )
 
-        return (
-          (userEmail &&
-            teacherEmail &&
-            userEmail === teacherEmail) ||
-          (userName &&
-            teacherName &&
-            userName === teacherName)
-        )
-      }) ?? null
-    )
-  }, [
-    isTeacher,
-    currentUser,
-    teachers,
-  ])
+      return (
+        teachers.find(
+          (teacher) => {
+            const teacherEmail =
+              normalize(
+                teacher.email
+              )
 
-  const availableSubjects = useMemo(() => {
-    if (!selectedClass) {
-      return []
-    }
+            const teacherName =
+              normalize(
+                teacher.name ??
+                  `${teacher.firstName ?? ""} ${
+                    teacher.lastName ?? ""
+                  }`
+              )
 
-    const selectedClassObject = schoolClasses.find(
-      (item) => String(item.id) === selectedClass
-    )
+            return (
+              (userEmail &&
+                teacherEmail &&
+                userEmail ===
+                  teacherEmail) ||
+              (userName &&
+                teacherName &&
+                userName ===
+                  teacherName)
+            )
+          }
+        ) ?? null
+      )
+    }, [
+      isTeacher,
+      currentUser,
+      teachers,
+    ])
 
-    if (!selectedClassObject) {
-      return []
-    }
+  /*
+   * =========================================================
+   * AVAILABLE SUBJECTS
+   * =========================================================
+   */
 
-    if (isTeacher) {
-      if (!currentTeacher) {
+  const availableSubjects =
+    useMemo(() => {
+      if (!selectedClass) {
         return []
       }
 
-      const assignedSubjectIds = new Set(
-        assignments
-          .filter(
-            (assignment) =>
-              assignment.teacher_id ===
-                currentTeacher.id &&
-              String(assignment.class_id) ===
-                selectedClass
-          )
-          .map(
-            (assignment) =>
-              assignment.subject_id
-          )
-      )
+      const selectedClassObject =
+        schoolClasses.find(
+          (item) =>
+            String(item.id) ===
+            selectedClass
+        )
 
-      return subjects.filter((subject) =>
-        assignedSubjectIds.has(subject.id)
-      )
-    }
-
-    const className = normalize(
-      selectedClassObject.name
-    )
-
-    const isJuniorSchool =
-      className.includes("grade 7") ||
-      className.includes("grade 8") ||
-      className.includes("grade 9") ||
-      className.includes("junior")
-
-    if (isJuniorSchool) {
-      const juniorSubjects = subjects.filter(
-        (subject) =>
-          normalize(subject.category) ===
-            "junior school" ||
-          normalize(subject.category) ===
-            "junior"
-      )
-
-      if (juniorSubjects.length > 0) {
-        return juniorSubjects
+      if (!selectedClassObject) {
+        return []
       }
-    }
 
-    return subjects
-  }, [
-    selectedClass,
-    schoolClasses,
-    isTeacher,
-    currentTeacher,
-    assignments,
-    subjects,
-  ])
+      if (isTeacher) {
+        if (!currentTeacher) {
+          return []
+        }
 
+        const assignedSubjectIds =
+          new Set(
+            assignments
+              .filter(
+                (assignment) =>
+                  assignment.teacher_id ===
+                    currentTeacher.id &&
+                  String(
+                    assignment.class_id
+                  ) ===
+                    selectedClass
+              )
+              .map(
+                (assignment) =>
+                  assignment.subject_id
+              )
+          )
+
+        return subjects.filter(
+          (subject) =>
+            assignedSubjectIds.has(
+              subject.id
+            )
+        )
+      }
+
+      const className =
+        normalize(
+          selectedClassObject.name
+        )
+
+      const isJuniorSchool =
+        className.includes(
+          "grade 7"
+        ) ||
+        className.includes(
+          "grade 8"
+        ) ||
+        className.includes(
+          "grade 9"
+        ) ||
+        className.includes(
+          "junior"
+        )
+
+      if (isJuniorSchool) {
+        const juniorSubjects =
+          subjects.filter(
+            (subject) =>
+              normalize(
+                subject.category
+              ) ===
+                "junior school" ||
+              normalize(
+                subject.category
+              ) === "junior"
+          )
+
+        if (
+          juniorSubjects.length >
+          0
+        ) {
+          return juniorSubjects
+        }
+      }
+
+      return subjects
+    }, [
+      selectedClass,
+      schoolClasses,
+      isTeacher,
+      currentTeacher,
+      assignments,
+      subjects,
+    ])
+
+  /*
+   * Reset subject when class changes.
+   */
   useEffect(() => {
     setSelectedSubject("")
     setScores({})
   }, [selectedClass])
 
+  /*
+   * Make sure selected subject remains valid.
+   */
   useEffect(() => {
     if (
       selectedSubject &&
       !availableSubjects.some(
         (subject) =>
-          String(subject.id) === selectedSubject
+          String(subject.id) ===
+          selectedSubject
       )
     ) {
       setSelectedSubject("")
@@ -580,22 +826,55 @@ export default function MarksPage() {
     availableSubjects,
   ])
 
-  const selectedSubjectObject = useMemo(() => {
-    return subjects.find(
-      (subject) =>
-        String(subject.id) === selectedSubject
-    )
-  }, [
-    subjects,
-    selectedSubject,
-  ])
+  const selectedSubjectObject =
+    useMemo(() => {
+      return subjects.find(
+        (subject) =>
+          String(subject.id) ===
+          selectedSubject
+      )
+    }, [
+      subjects,
+      selectedSubject,
+    ])
 
-  const selectedExamObject = useMemo(() => {
-    return exams.find(
-      (exam) =>
-        String(exam.id) === selectedExam
-    )
-  }, [exams, selectedExam])
+  const selectedExamObject =
+    useMemo(() => {
+      return exams.find(
+        (exam) =>
+          String(exam.id) ===
+          selectedExam
+      )
+    }, [
+      exams,
+      selectedExam,
+    ])
+
+  /*
+   * =========================================================
+   * FAST MARK LOOKUP
+   * =========================================================
+   *
+   * Instead of repeatedly doing marks.find(...),
+   * create a Map once.
+   */
+
+  const markMap = useMemo(() => {
+    const map =
+      new Map<
+        string,
+        Mark
+      >()
+
+    for (const mark of marks) {
+      map.set(
+        `${mark.examId}-${mark.studentId}-${mark.subjectId}`,
+        mark
+      )
+    }
+
+    return map
+  }, [marks])
 
   function scoreKey(
     studentId: number,
@@ -603,6 +882,20 @@ export default function MarksPage() {
   ) {
     return `${studentId}-${subjectId}`
   }
+
+  function markLookupKey(
+    examId: number,
+    studentId: number,
+    subjectId: number
+  ) {
+    return `${examId}-${studentId}-${subjectId}`
+  }
+
+  /*
+   * =========================================================
+   * LOAD EXISTING SCORES INTO INPUTS
+   * =========================================================
+   */
 
   useEffect(() => {
     if (
@@ -621,31 +914,24 @@ export default function MarksPage() {
     > = {}
 
     for (const student of classStudents) {
-      const existingMark = marks.find(
-        (mark) =>
-          mark.examId ===
-            Number(selectedExam) &&
-          mark.studentId ===
-            student.id &&
-          mark.subjectId ===
+      const existingMark =
+        markMap.get(
+          markLookupKey(
+            Number(selectedExam),
+            student.id,
             Number(selectedSubject)
-      )
+          )
+        )
 
-      if (existingMark) {
-        nextScores[
-          scoreKey(
-            student.id,
-            Number(selectedSubject)
-          )
-        ] = existingMark.score
-      } else {
-        nextScores[
-          scoreKey(
-            student.id,
-            Number(selectedSubject)
-          )
-        ] = ""
-      }
+      nextScores[
+        scoreKey(
+          student.id,
+          Number(selectedSubject)
+        )
+      ] =
+        existingMark
+          ? existingMark.score
+          : ""
     }
 
     setScores(nextScores)
@@ -654,8 +940,14 @@ export default function MarksPage() {
     selectedExam,
     selectedSubject,
     classStudents,
-    marks,
+    markMap,
   ])
+
+  /*
+   * =========================================================
+   * UPDATE SCORE
+   * =========================================================
+   */
 
   function updateScore(
     studentId: number,
@@ -674,16 +966,25 @@ export default function MarksPage() {
       return
     }
 
-    let numericValue = Number(value)
+    let numericValue =
+      Number(value)
 
-    if (Number.isNaN(numericValue)) {
+    if (
+      Number.isNaN(
+        numericValue
+      )
+    ) {
       return
     }
 
-    numericValue = Math.max(
-      0,
-      Math.min(100, numericValue)
-    )
+    numericValue =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          numericValue
+        )
+      )
 
     setScores((previous) => ({
       ...previous,
@@ -691,26 +992,40 @@ export default function MarksPage() {
     }))
   }
 
+  /*
+   * =========================================================
+   * SAVE MARKS
+   * =========================================================
+   */
+
   async function saveMarks() {
     if (!selectedClass) {
-      setMessage("Please select a class.")
+      setMessage(
+        "Please select a class."
+      )
       setMessageType("error")
       return
     }
 
     if (!selectedExam) {
-      setMessage("Please select an exam.")
+      setMessage(
+        "Please select an exam."
+      )
       setMessageType("error")
       return
     }
 
     if (!selectedSubject) {
-      setMessage("Please select a subject.")
+      setMessage(
+        "Please select a subject."
+      )
       setMessageType("error")
       return
     }
 
-    if (classStudents.length === 0) {
+    if (
+      classStudents.length === 0
+    ) {
       setMessage(
         "There are no students in the selected class."
       )
@@ -718,33 +1033,49 @@ export default function MarksPage() {
       return
     }
 
-    const entries = classStudents
-      .map((student) => {
-        const value =
-          scores[
-            scoreKey(
+    const entries =
+      classStudents
+        .map((student) => {
+          const value =
+            scores[
+              scoreKey(
+                student.id,
+                Number(
+                  selectedSubject
+                )
+              )
+            ]
+
+          if (
+            value === "" ||
+            value === undefined
+          ) {
+            return null
+          }
+
+          return {
+            studentId:
               student.id,
-              Number(selectedSubject)
-            )
-          ]
+            subjectId:
+              Number(
+                selectedSubject
+              ),
+            score: Number(value),
+          }
+        })
+        .filter(
+          (
+            entry
+          ): entry is {
+            studentId: number
+            subjectId: number
+            score: number
+          } => entry !== null
+        )
 
-        if (
-          value === "" ||
-          value === undefined
-        ) {
-          return null
-        }
-
-        return {
-          examId: Number(selectedExam),
-          studentId: student.id,
-          subjectId: Number(selectedSubject),
-          score: Number(value),
-        }
-      })
-      .filter(Boolean)
-
-    if (entries.length === 0) {
+    if (
+      entries.length === 0
+    ) {
       setMessage(
         "Please enter at least one mark."
       )
@@ -756,17 +1087,32 @@ export default function MarksPage() {
       setSaving(true)
       setMessage("")
 
-      const response = await fetch("/api/marks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          marks: entries,
-        }),
-      })
+      /*
+       * IMPORTANT:
+       * examId belongs at the top level because
+       * /api/marks reads body.examId.
+       */
+      const response =
+        await fetch(
+          "/api/marks",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              examId:
+                Number(
+                  selectedExam
+                ),
+              marks: entries,
+            }),
+          }
+        )
 
-      const data = await response.json()
+      const data =
+        await response.json()
 
       if (!response.ok) {
         throw new Error(
@@ -777,13 +1123,19 @@ export default function MarksPage() {
 
       setMessage(
         `${entries.length} mark${
-          entries.length === 1 ? "" : "s"
+          entries.length === 1
+            ? ""
+            : "s"
         } saved successfully.`
       )
 
       setMessageType("success")
 
-      await loadData()
+      /*
+       * Reload only marks for the current
+       * exam/class.
+       */
+      await loadMarks()
     } catch (error) {
       console.error(
         "Failed to save marks:",
@@ -802,6 +1154,12 @@ export default function MarksPage() {
     }
   }
 
+  /*
+   * =========================================================
+   * DOWNLOAD SUBJECT MARKS
+   * =========================================================
+   */
+
   function downloadClassMarks() {
     if (
       !selectedClass ||
@@ -814,19 +1172,22 @@ export default function MarksPage() {
     const selectedClassObject =
       schoolClasses.find(
         (item) =>
-          String(item.id) === selectedClass
+          String(item.id) ===
+          selectedClass
       )
 
     const selectedSubjectObject =
       subjects.find(
         (item) =>
-          String(item.id) === selectedSubject
+          String(item.id) ===
+          selectedSubject
       )
 
     const selectedExamObject =
       exams.find(
         (item) =>
-          String(item.id) === selectedExam
+          String(item.id) ===
+          selectedExam
       )
 
     if (
@@ -848,37 +1209,50 @@ export default function MarksPage() {
       "Marks",
     ]
 
-    const rows = classStudents.map(
-      (student) => {
-        const mark = marks.find(
-          (item) =>
-            item.examId ===
-              Number(selectedExam) &&
-            item.studentId ===
-              student.id &&
-            item.subjectId ===
-              Number(selectedSubject)
-        )
+    const rows =
+      classStudents.map(
+        (student) => {
+          const mark =
+            markMap.get(
+              markLookupKey(
+                Number(
+                  selectedExam
+                ),
+                student.id,
+                Number(
+                  selectedSubject
+                )
+              )
+            )
 
-        const studentName =
-          `${student.firstName} ${
-            student.middleName ?? ""
-          } ${
-            student.lastName ?? ""
-          }`.replace(/\s+/g, " ").trim()
+          const studentName =
+            `${student.firstName} ${
+              student.middleName ??
+              ""
+            } ${
+              student.lastName ??
+              ""
+            }`
+              .replace(
+                /\s+/g,
+                " "
+              )
+              .trim()
 
-        return [
-          student.admissionNo,
-          studentName,
-          selectedClassObject.name,
-          selectedExamObject.name,
-          selectedExamObject.term ?? "",
-          selectedExamObject.year ?? "",
-          selectedSubjectObject.name,
-          mark?.score ?? "",
-        ]
-      }
-    )
+          return [
+            student.admissionNo,
+            studentName,
+            selectedClassObject.name,
+            selectedExamObject.name,
+            selectedExamObject.term ??
+              "",
+            selectedExamObject.year ??
+              "",
+            selectedSubjectObject.name,
+            mark?.score ?? "",
+          ]
+        }
+      )
 
     const csv = [
       header,
@@ -887,7 +1261,11 @@ export default function MarksPage() {
       .map((row) =>
         row
           .map((value) => {
-            const text = String(value ?? "")
+            const text =
+              String(
+                value ?? ""
+              )
+
             return `"${text.replace(
               /"/g,
               '""'
@@ -900,243 +1278,317 @@ export default function MarksPage() {
     const blob = new Blob(
       [csv],
       {
-        type: "text/csv;charset=utf-8;",
+        type:
+          "text/csv;charset=utf-8;",
       }
     )
 
     const url =
-      URL.createObjectURL(blob)
+      URL.createObjectURL(
+        blob
+      )
 
     const link =
-      document.createElement("a")
+      document.createElement(
+        "a"
+      )
 
     link.href = url
 
     link.download =
       `${selectedClassObject.name}-${selectedExamObject.name}-${selectedSubjectObject.name}-marks.csv`
-        .replace(/[^\w.-]+/g, "_")
+        .replace(
+          /[^\w.-]+/g,
+          "_"
+        )
 
-    document.body.appendChild(link)
+    document.body.appendChild(
+      link
+    )
+
     link.click()
+
     link.remove()
 
     URL.revokeObjectURL(url)
   }
 
   /*
-   * PAST RESULTS
-   *
-   * This section calculates a complete results table
-   * for the selected class and exam.
-   *
-   * It does NOT depend on the selected subject.
-   * Therefore, selecting any subject or no subject still
-   * allows the administrator to see the complete results.
+   * =========================================================
+   * PAST RESULTS SUBJECTS
+   * =========================================================
    */
-  const resultSubjects = useMemo(() => {
-    if (!selectedClass) {
-      return []
-    }
 
-    const selectedClassObject =
-      schoolClasses.find(
-        (item) =>
-          String(item.id) === selectedClass
-      )
-
-    if (!selectedClassObject) {
-      return []
-    }
-
-    const className = normalize(
-      selectedClassObject.name
-    )
-
-    const isJuniorSchool =
-      className.includes("grade 7") ||
-      className.includes("grade 8") ||
-      className.includes("grade 9") ||
-      className.includes("junior")
-
-    if (isJuniorSchool) {
-      const juniorSubjects =
-        subjects.filter(
-          (subject) =>
-            normalize(subject.category) ===
-              "junior school" ||
-            normalize(subject.category) ===
-              "junior"
-        )
-
-      if (juniorSubjects.length > 0) {
-        return juniorSubjects.sort(
-          (a, b) =>
-            a.id - b.id
-        )
+  const resultSubjects =
+    useMemo(() => {
+      if (!selectedClass) {
+        return []
       }
-    }
 
-    return [...subjects].sort(
-      (a, b) => a.id - b.id
-    )
-  }, [
-    selectedClass,
-    schoolClasses,
-    subjects,
-  ])
+      const selectedClassObject =
+        schoolClasses.find(
+          (item) =>
+            String(item.id) ===
+            selectedClass
+        )
 
-  const resultRows = useMemo<ResultRow[]>(() => {
-    if (
-      !selectedClass ||
-      !selectedExam ||
-      resultSubjects.length === 0
-    ) {
-      return []
-    }
+      if (!selectedClassObject) {
+        return []
+      }
 
-    const rows = classStudents.map(
-      (student) => {
-        const subjectScores: Record<
-          number,
-          number | null
-        > = {}
+      const className =
+        normalize(
+          selectedClassObject.name
+        )
 
-        let total = 0
-        let completedSubjects = 0
+      const isJuniorSchool =
+        className.includes(
+          "grade 7"
+        ) ||
+        className.includes(
+          "grade 8"
+        ) ||
+        className.includes(
+          "grade 9"
+        ) ||
+        className.includes(
+          "junior"
+        )
 
-        for (const subject of resultSubjects) {
-          const existingMark = marks.find(
-            (mark) =>
-              mark.examId ===
-                Number(selectedExam) &&
-              mark.studentId ===
-                student.id &&
-              mark.subjectId ===
-                subject.id
-          )
-
-          if (existingMark) {
-            subjectScores[subject.id] =
-              existingMark.score
-
-            total += Number(
-              existingMark.score
+      if (isJuniorSchool) {
+        const juniorSubjects =
+          subjects
+            .filter(
+              (subject) =>
+                normalize(
+                  subject.category
+                ) ===
+                  "junior school" ||
+                normalize(
+                  subject.category
+                ) ===
+                  "junior"
+            )
+            .sort(
+              (a, b) =>
+                a.id - b.id
             )
 
-            completedSubjects++
-          } else {
-            subjectScores[subject.id] = null
+        if (
+          juniorSubjects.length >
+          0
+        ) {
+          return juniorSubjects
+        }
+      }
+
+      return [...subjects].sort(
+        (a, b) =>
+          a.id - b.id
+      )
+    }, [
+      selectedClass,
+      schoolClasses,
+      subjects,
+    ])
+
+  /*
+   * =========================================================
+   * PAST RESULTS ROWS
+   * =========================================================
+   */
+
+  const resultRows =
+    useMemo<ResultRow[]>(() => {
+      if (
+        !selectedClass ||
+        !selectedExam ||
+        resultSubjects.length ===
+          0
+      ) {
+        return []
+      }
+
+      const examNumber =
+        Number(selectedExam)
+
+      const rows =
+        classStudents.map(
+          (student) => {
+            const subjectScores: Record<
+              number,
+              number | null
+            > = {}
+
+            let total = 0
+            let completedSubjects =
+              0
+
+            for (const subject of resultSubjects) {
+              const existingMark =
+                markMap.get(
+                  markLookupKey(
+                    examNumber,
+                    student.id,
+                    subject.id
+                  )
+                )
+
+              if (
+                existingMark
+              ) {
+                subjectScores[
+                  subject.id
+                ] =
+                  existingMark.score
+
+                total += Number(
+                  existingMark.score
+                )
+
+                completedSubjects++
+              } else {
+                subjectScores[
+                  subject.id
+                ] = null
+              }
+            }
+
+            return {
+              student,
+              subjectScores,
+              total,
+              completedSubjects,
+              position: null,
+            }
+          }
+        )
+
+      /*
+       * Rank only learners who have marks
+       * in every subject.
+       */
+      const completeRows =
+        rows
+          .filter(
+            (row) =>
+              row.completedSubjects ===
+              resultSubjects.length
+          )
+          .sort(
+            (a, b) =>
+              b.total - a.total
+          )
+
+      let previousTotal:
+        number | null = null
+
+      let previousPosition =
+        0
+
+      completeRows.forEach(
+        (row, index) => {
+          if (
+            previousTotal ===
+              null ||
+            row.total !==
+              previousTotal
+          ) {
+            previousPosition =
+              index + 1
+          }
+
+          row.position =
+            previousPosition
+
+          previousTotal =
+            row.total
+        }
+      )
+
+      const positionMap =
+        new Map<
+          number,
+          number
+        >()
+
+      completeRows.forEach(
+        (row) => {
+          if (
+            row.position !==
+            null
+          ) {
+            positionMap.set(
+              row.student.id,
+              row.position
+            )
           }
         }
-
-        return {
-          student,
-          subjectScores,
-          total,
-          completedSubjects,
-          position: null,
-        }
-      }
-    )
-
-    /*
-     * Rank only learners who have marks for every
-     * subject in the selected exam.
-     *
-     * This prevents an incomplete result from being
-     * incorrectly ranked.
-     */
-    const completeRows = rows
-      .filter(
-        (row) =>
-          row.completedSubjects ===
-          resultSubjects.length
-      )
-      .sort(
-        (a, b) =>
-          b.total - a.total
       )
 
-    let previousTotal: number | null = null
-    let previousPosition = 0
+      return rows
+        .map((row) => ({
+          ...row,
+          position:
+            positionMap.get(
+              row.student.id
+            ) ?? null,
+        }))
+        .sort((a, b) => {
+          if (
+            a.position !==
+              null &&
+            b.position !==
+              null
+          ) {
+            return (
+              a.position -
+              b.position
+            )
+          }
 
-    completeRows.forEach(
-      (row, index) => {
-        if (
-          previousTotal === null ||
-          row.total !== previousTotal
-        ) {
-          previousPosition = index + 1
-        }
+          if (
+            a.position !==
+              null &&
+            b.position ===
+              null
+          ) {
+            return -1
+          }
 
-        row.position = previousPosition
-        previousTotal = row.total
-      }
-    )
+          if (
+            a.position ===
+              null &&
+            b.position !==
+              null
+          ) {
+            return 1
+          }
 
-    const positionMap =
-      new Map<number, number>()
-
-    completeRows.forEach(
-      (row) => {
-        if (row.position !== null) {
-          positionMap.set(
-            row.student.id,
-            row.position
+          return a.student.firstName.localeCompare(
+            b.student.firstName
           )
-        }
-      }
-    )
+        })
+    }, [
+      selectedClass,
+      selectedExam,
+      classStudents,
+      resultSubjects,
+      markMap,
+    ])
 
-    return rows
-      .map((row) => ({
-        ...row,
-        position:
-          positionMap.get(
-            row.student.id
-          ) ?? null,
-      }))
-      .sort((a, b) => {
-        if (
-          a.position !== null &&
-          b.position !== null
-        ) {
-          return (
-            a.position - b.position
-          )
-        }
-
-        if (
-          a.position !== null &&
-          b.position === null
-        ) {
-          return -1
-        }
-
-        if (
-          a.position === null &&
-          b.position !== null
-        ) {
-          return 1
-        }
-
-        return a.student.firstName.localeCompare(
-          b.student.firstName
-        )
-      })
-  }, [
-    selectedClass,
-    selectedExam,
-    classStudents,
-    resultSubjects,
-    marks,
-  ])
+  /*
+   * =========================================================
+   * DOWNLOAD COMPLETE RESULTS
+   * =========================================================
+   */
 
   function downloadResults() {
     if (
       !selectedClass ||
       !selectedExam ||
-      resultSubjects.length === 0 ||
+      resultSubjects.length ===
+        0 ||
       resultRows.length === 0
     ) {
       return
@@ -1145,13 +1597,15 @@ export default function MarksPage() {
     const selectedClassObject =
       schoolClasses.find(
         (item) =>
-          String(item.id) === selectedClass
+          String(item.id) ===
+          selectedClass
       )
 
     const selectedExamObject =
       exams.find(
         (item) =>
-          String(item.id) === selectedExam
+          String(item.id) ===
+          selectedExam
       )
 
     if (
@@ -1166,36 +1620,45 @@ export default function MarksPage() {
       "Admission No",
       "Student Name",
       ...resultSubjects.map(
-        (subject) => subject.name
+        (subject) =>
+          subject.name
       ),
       "Total",
       "Subjects Completed",
     ]
 
-    const rows = resultRows.map(
-      (row) => {
-        const studentName =
-          `${row.student.firstName} ${
-            row.student.middleName ?? ""
-          } ${
-            row.student.lastName ?? ""
-          }`.replace(/\s+/g, " ").trim()
+    const rows =
+      resultRows.map(
+        (row) => {
+          const studentName =
+            `${row.student.firstName} ${
+              row.student.middleName ??
+              ""
+            } ${
+              row.student.lastName ??
+              ""
+            }`
+              .replace(
+                /\s+/g,
+                " "
+              )
+              .trim()
 
-        return [
-          row.position ?? "",
-          row.student.admissionNo,
-          studentName,
-          ...resultSubjects.map(
-            (subject) =>
-              row.subjectScores[
-                subject.id
-              ] ?? ""
-          ),
-          row.total,
-          row.completedSubjects,
-        ]
-      }
-    )
+          return [
+            row.position ?? "",
+            row.student.admissionNo,
+            studentName,
+            ...resultSubjects.map(
+              (subject) =>
+                row.subjectScores[
+                  subject.id
+                ] ?? ""
+            ),
+            row.total,
+            row.completedSubjects,
+          ]
+        }
+      )
 
     const csv = [
       header,
@@ -1204,7 +1667,11 @@ export default function MarksPage() {
       .map((row) =>
         row
           .map((value) => {
-            const text = String(value ?? "")
+            const text =
+              String(
+                value ?? ""
+              )
+
             return `"${text.replace(
               /"/g,
               '""'
@@ -1217,24 +1684,36 @@ export default function MarksPage() {
     const blob = new Blob(
       [csv],
       {
-        type: "text/csv;charset=utf-8;",
+        type:
+          "text/csv;charset=utf-8;",
       }
     )
 
     const url =
-      URL.createObjectURL(blob)
+      URL.createObjectURL(
+        blob
+      )
 
     const link =
-      document.createElement("a")
+      document.createElement(
+        "a"
+      )
 
     link.href = url
 
     link.download =
       `${selectedClassObject.name}-${selectedExamObject.name}-results.csv`
-        .replace(/[^\w.-]+/g, "_")
+        .replace(
+          /[^\w.-]+/g,
+          "_"
+        )
 
-    document.body.appendChild(link)
+    document.body.appendChild(
+      link
+    )
+
     link.click()
+
     link.remove()
 
     URL.revokeObjectURL(url)
@@ -1242,6 +1721,12 @@ export default function MarksPage() {
 
   const canSaveMarks =
     isAdmin || isTeacher
+
+  /*
+   * =========================================================
+   * RENDER
+   * =========================================================
+   */
 
   return (
     <div className="space-y-6">
@@ -1289,14 +1774,22 @@ export default function MarksPage() {
                       Select class
                     </option>
 
-                    {classes.map((schoolClass) => (
-                      <option
-                        key={schoolClass.id}
-                        value={schoolClass.id}
-                      >
-                        {schoolClass.name}
-                      </option>
-                    ))}
+                    {classes.map(
+                      (schoolClass) => (
+                        <option
+                          key={
+                            schoolClass.id
+                          }
+                          value={
+                            schoolClass.id
+                          }
+                        >
+                          {
+                            schoolClass.name
+                          }
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
 
@@ -1318,20 +1811,22 @@ export default function MarksPage() {
                       Select exam
                     </option>
 
-                    {exams.map((exam) => (
-                      <option
-                        key={exam.id}
-                        value={exam.id}
-                      >
-                        {exam.name}
-                        {exam.term
-                          ? ` - ${exam.term}`
-                          : ""}
-                        {exam.year
-                          ? ` ${exam.year}`
-                          : ""}
-                      </option>
-                    ))}
+                    {exams.map(
+                      (exam) => (
+                        <option
+                          key={exam.id}
+                          value={exam.id}
+                        >
+                          {exam.name}
+                          {exam.term
+                            ? ` - ${exam.term}`
+                            : ""}
+                          {exam.year
+                            ? ` ${exam.year}`
+                            : ""}
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
 
@@ -1341,7 +1836,9 @@ export default function MarksPage() {
                   </label>
 
                   <select
-                    value={selectedSubject}
+                    value={
+                      selectedSubject
+                    }
                     onChange={(event) =>
                       setSelectedSubject(
                         event.target.value
@@ -1359,10 +1856,16 @@ export default function MarksPage() {
                     {availableSubjects.map(
                       (subject) => (
                         <option
-                          key={subject.id}
-                          value={subject.id}
+                          key={
+                            subject.id
+                          }
+                          value={
+                            subject.id
+                          }
                         >
-                          {subject.name}
+                          {
+                            subject.name
+                          }
                         </option>
                       )
                     )}
@@ -1373,7 +1876,10 @@ export default function MarksPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={loadData}
+                    onClick={() => {
+                      loadData()
+                      loadMarks()
+                    }}
                     className="w-full"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
@@ -1386,8 +1892,9 @@ export default function MarksPage() {
                 selectedClass &&
                 !currentTeacher && (
                   <div className="mt-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
-                    Your teacher account could not
-                    be matched to a teacher record.
+                    Your teacher account
+                    could not be matched
+                    to a teacher record.
                   </div>
                 )}
 
@@ -1397,8 +1904,9 @@ export default function MarksPage() {
                 availableSubjects.length ===
                   0 && (
                   <div className="mt-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
-                    No subjects are assigned to you
-                    for this class.
+                    No subjects are
+                    assigned to you for
+                    this class.
                   </div>
                 )}
             </CardContent>
@@ -1412,11 +1920,14 @@ export default function MarksPage() {
                   <p className="text-sm text-muted-foreground">
                     Selected Class
                   </p>
+
                   <p className="mt-1 text-xl font-bold">
                     {
                       schoolClasses.find(
                         (item) =>
-                          String(item.id) ===
+                          String(
+                            item.id
+                          ) ===
                           selectedClass
                       )?.name
                     }
@@ -1429,8 +1940,11 @@ export default function MarksPage() {
                   <p className="text-sm text-muted-foreground">
                     Students
                   </p>
+
                   <p className="mt-1 text-xl font-bold">
-                    {classStudents.length}
+                    {
+                      classStudents.length
+                    }
                   </p>
                 </CardContent>
               </Card>
@@ -1440,8 +1954,11 @@ export default function MarksPage() {
                   <p className="text-sm text-muted-foreground">
                     Available Subjects
                   </p>
+
                   <p className="mt-1 text-xl font-bold">
-                    {availableSubjects.length}
+                    {
+                      availableSubjects.length
+                    }
                   </p>
                 </CardContent>
               </Card>
@@ -1451,9 +1968,12 @@ export default function MarksPage() {
                   <p className="text-sm text-muted-foreground">
                     Selected Subject
                   </p>
+
                   <p className="mt-1 text-xl font-bold">
-                    {selectedSubjectObject?.name ??
-                      "None"}
+                    {
+                      selectedSubjectObject?.name ??
+                      "None"
+                    }
                   </p>
                 </CardContent>
               </Card>
@@ -1504,8 +2024,13 @@ export default function MarksPage() {
                       {canSaveMarks && (
                         <Button
                           type="button"
-                          onClick={saveMarks}
-                          disabled={saving}
+                          onClick={
+                            saveMarks
+                          }
+                          disabled={
+                            saving ||
+                            marksLoading
+                          }
                         >
                           {saving ? (
                             <>
@@ -1513,9 +2038,7 @@ export default function MarksPage() {
                               Saving...
                             </>
                           ) : (
-                            <>
-                              Save All Marks
-                            </>
+                            "Save All Marks"
                           )}
                         </Button>
                       )}
@@ -1544,11 +2067,20 @@ export default function MarksPage() {
                     </div>
                   )}
 
-                  {classStudents.length ===
-                  0 ? (
+                  {marksLoading ? (
                     <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
-                      No students found in this
-                      class.
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Loading marks for
+                        this class and
+                        exam...
+                      </div>
+                    </div>
+                  ) : classStudents.length ===
+                    0 ? (
+                    <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
+                      No students found
+                      in this class.
                     </div>
                   ) : (
                     <div className="overflow-x-auto rounded-md border">
@@ -1588,7 +2120,9 @@ export default function MarksPage() {
                                 )
 
                               const value =
-                                scores[key] ?? ""
+                                scores[
+                                  key
+                                ] ?? ""
 
                               return (
                                 <tr
@@ -1598,7 +2132,10 @@ export default function MarksPage() {
                                   className="border-t"
                                 >
                                   <td className="px-4 py-3">
-                                    {index + 1}
+                                    {
+                                      index +
+                                      1
+                                    }
                                   </td>
 
                                   <td className="px-4 py-3 font-medium">
@@ -1632,7 +2169,8 @@ export default function MarksPage() {
                                         value
                                       }
                                       disabled={
-                                        !canSaveMarks
+                                        !canSaveMarks ||
+                                        marksLoading
                                       }
                                       onChange={(
                                         event
@@ -1660,7 +2198,7 @@ export default function MarksPage() {
               </Card>
             )}
 
-          {/* PAST RESULTS / RESULTS SUMMARY */}
+          {/* PAST RESULTS */}
           {isAdmin &&
             selectedClass &&
             selectedExam && (
@@ -1676,7 +2214,9 @@ export default function MarksPage() {
                         {
                           schoolClasses.find(
                             (item) =>
-                              String(item.id) ===
+                              String(
+                                item.id
+                              ) ===
                               selectedClass
                           )?.name
                         }{" "}
@@ -1696,9 +2236,12 @@ export default function MarksPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={downloadResults}
+                      onClick={
+                        downloadResults
+                      }
                       disabled={
-                        resultRows.length === 0
+                        resultRows.length ===
+                        0
                       }
                     >
                       <Download className="mr-2 h-4 w-4" />
@@ -1708,11 +2251,20 @@ export default function MarksPage() {
                 </CardHeader>
 
                 <CardContent>
-                  {resultRows.length ===
-                  0 ? (
+                  {marksLoading ? (
                     <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
-                      No past results found for
-                      this class and exam.
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Loading past
+                        results...
+                      </div>
+                    </div>
+                  ) : resultRows.length ===
+                    0 ? (
+                    <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
+                      No past results
+                      found for this
+                      class and exam.
                     </div>
                   ) : (
                     <>
@@ -1721,8 +2273,11 @@ export default function MarksPage() {
                           <p className="text-sm text-muted-foreground">
                             Learners
                           </p>
+
                           <p className="mt-1 text-xl font-bold">
-                            {resultRows.length}
+                            {
+                              resultRows.length
+                            }
                           </p>
                         </div>
 
@@ -1730,6 +2285,7 @@ export default function MarksPage() {
                           <p className="text-sm text-muted-foreground">
                             Subjects
                           </p>
+
                           <p className="mt-1 text-xl font-bold">
                             {
                               resultSubjects.length
@@ -1741,10 +2297,13 @@ export default function MarksPage() {
                           <p className="text-sm text-muted-foreground">
                             Complete Results
                           </p>
+
                           <p className="mt-1 text-xl font-bold">
                             {
                               resultRows.filter(
-                                (row) =>
+                                (
+                                  row
+                                ) =>
                                   row.completedSubjects ===
                                   resultSubjects.length
                               ).length
@@ -1756,12 +2315,15 @@ export default function MarksPage() {
                           <p className="text-sm text-muted-foreground">
                             Highest Total
                           </p>
+
                           <p className="mt-1 text-xl font-bold">
                             {resultRows.length >
                             0
                               ? Math.max(
                                   ...resultRows.map(
-                                    (row) =>
+                                    (
+                                      row
+                                    ) =>
                                       row.total
                                   )
                                 )
@@ -1787,7 +2349,9 @@ export default function MarksPage() {
                               </th>
 
                               {resultSubjects.map(
-                                (subject) => (
+                                (
+                                  subject
+                                ) => (
                                   <th
                                     key={
                                       subject.id
@@ -1893,7 +2457,9 @@ export default function MarksPage() {
                                     )}
 
                                     <td className="px-3 py-3 text-center font-bold">
-                                      {row.total}
+                                      {
+                                        row.total
+                                      }
                                     </td>
 
                                     <td className="px-3 py-3 text-center">
@@ -1919,12 +2485,19 @@ export default function MarksPage() {
                       </div>
 
                       <div className="mt-4 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-                        <strong>Note:</strong>{" "}
-                        Position is calculated only
-                        for learners who have marks
-                        recorded in every subject for
-                        the selected exam. Equal totals
-                        receive the same position.
+                        <strong>
+                          Note:
+                        </strong>{" "}
+                        Position is
+                        calculated only
+                        for learners who
+                        have marks
+                        recorded in every
+                        subject for the
+                        selected exam.
+                        Equal totals
+                        receive the same
+                        position.
                       </div>
                     </>
                   )}
