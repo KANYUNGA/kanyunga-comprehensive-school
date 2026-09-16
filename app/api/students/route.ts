@@ -1,4 +1,3 @@
-
 import { getDb } from "@/lib/db"
 import { requireAdmin } from "@/lib/server-auth"
 
@@ -28,50 +27,23 @@ function formatDate(value: unknown): string {
 function mapStudent(student: any) {
   return {
     id: String(student.id),
-
     admissionNo: safeString(student.admission_number),
-
     firstName: safeString(student.first_name),
-
     middleName: safeString(student.middle_name),
-
     lastName: safeString(student.last_name),
-
     gender: safeString(student.gender),
-
     classId: safeString(student.class_name),
-
     className: safeString(student.class_name),
-
     stream: safeString(student.stream),
-
     dateOfBirth: formatDate(student.date_of_birth),
-
     guardianName: safeString(student.parent_name),
-
     guardianPhone: safeString(student.parent_phone),
-
     address: safeString(student.address),
-
     email: safeString(student.email),
-
     admissionDate: formatDate(student.admission_date),
-
     status: safeString(student.status) || "Active",
-
     photoUrl: safeString(student.photo_url),
   }
-}
-
-/* =========================================================
-   ENSURE PHOTO COLUMN EXISTS
-   ========================================================= */
-
-async function ensurePhotoColumn() {
-  await sql`
-    ALTER TABLE students
-    ADD COLUMN IF NOT EXISTS photo_url TEXT
-  `
 }
 
 /* =========================================================
@@ -80,12 +52,6 @@ async function ensurePhotoColumn() {
 
 export async function GET() {
   try {
-    /*
-     * Make sure the database has a place to store
-     * student passport photos.
-     */
-    await ensurePhotoColumn()
-
     const students = await sql`
       SELECT
         id,
@@ -148,44 +114,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    /*
-     * Make sure photo_url exists before inserting.
-     */
-    await ensurePhotoColumn()
-
     const body = await request.json()
 
-    const admissionNo = safeString(
-      body.admissionNo
-    ).trim()
-
-    const firstName = safeString(
-      body.firstName
-    ).trim()
-
-    const middleName = safeString(
-      body.middleName
-    ).trim()
-
-    const lastName = safeString(
-      body.lastName
-    ).trim()
-
-    const gender = safeString(
-      body.gender
-    ).trim()
+    const admissionNo = safeString(body.admissionNo).trim()
+    const firstName = safeString(body.firstName).trim()
+    const middleName = safeString(body.middleName).trim()
+    const lastName = safeString(body.lastName).trim()
+    const gender = safeString(body.gender).trim()
 
     const className = safeString(
       body.className ?? body.classId
     ).trim()
 
-    const stream = safeString(
-      body.stream
-    ).trim()
-
-    const dateOfBirth = safeString(
-      body.dateOfBirth
-    ).trim()
+    const stream = safeString(body.stream).trim()
+    const dateOfBirth = safeString(body.dateOfBirth).trim()
 
     const guardianName = safeString(
       body.guardianName
@@ -195,10 +137,7 @@ export async function POST(request: Request) {
       body.guardianPhone
     ).trim()
 
-    const address = safeString(
-      body.address
-    ).trim()
-
+    const address = safeString(body.address).trim()
     const admissionDate = safeString(
       body.admissionDate
     ).trim()
@@ -206,9 +145,7 @@ export async function POST(request: Request) {
     const status =
       safeString(body.status).trim() || "Active"
 
-    const photoUrl = safeString(
-      body.photoUrl
-    ).trim()
+    const photoUrl = safeString(body.photoUrl).trim()
 
     if (!admissionNo) {
       return Response.json(
@@ -240,9 +177,6 @@ export async function POST(request: Request) {
       )
     }
 
-    /*
-     * Check duplicate admission number.
-     */
     const existing = await sql`
       SELECT id
       FROM students
@@ -260,9 +194,6 @@ export async function POST(request: Request) {
       )
     }
 
-    /*
-     * Insert student including passport photo.
-     */
     const result = await sql`
       INSERT INTO students (
         admission_number,
@@ -338,5 +269,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-}
-
+  }
