@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -90,38 +91,81 @@ type ResultRow = {
 export default function MarksPage() {
   const { role, currentUser } = useSchool()
 
+  /*
+   * =========================================================
+   * ROLE
+   * =========================================================
+   */
+
   const normalizedRole =
-    typeof role === "string" ? role.toLowerCase() : ""
+    typeof role === "string"
+      ? role.trim().toLowerCase()
+      : ""
 
-  const isAdmin = normalizedRole === "admin"
-  const isTeacher = normalizedRole === "teacher"
+  const isAdmin =
+    normalizedRole === "admin" ||
+    normalizedRole === "administrator"
 
-  const [students, setStudents] = useState<Student[]>([])
-  const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([])
-  const [subjects, setSubjects] = useState<Subject[]>([])
-  const [exams, setExams] = useState<Exam[]>([])
-  const [marks, setMarks] = useState<Mark[]>([])
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [teachers, setTeachers] = useState<Teacher[]>([])
-
-  const [selectedClass, setSelectedClass] = useState("")
-  const [selectedExam, setSelectedExam] = useState("")
-  const [selectedSubject, setSelectedSubject] = useState("")
-
-  const [scores, setScores] = useState<Record<string, number | "">>({})
-
-  const [loading, setLoading] = useState(true)
-  const [marksLoading, setMarksLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  const [message, setMessage] = useState("")
-  const [messageType, setMessageType] = useState<
-    "success" | "error"
-  >("success")
+  const isTeacher =
+    normalizedRole === "teacher"
 
   /*
    * =========================================================
-   * NORMALIZE API DATA
+   * STATE
+   * =========================================================
+   */
+
+  const [students, setStudents] =
+    useState<Student[]>([])
+
+  const [schoolClasses, setSchoolClasses] =
+    useState<SchoolClass[]>([])
+
+  const [subjects, setSubjects] =
+    useState<Subject[]>([])
+
+  const [exams, setExams] =
+    useState<Exam[]>([])
+
+  const [marks, setMarks] =
+    useState<Mark[]>([])
+
+  const [assignments, setAssignments] =
+    useState<Assignment[]>([])
+
+  const [teachers, setTeachers] =
+    useState<Teacher[]>([])
+
+  const [selectedClass, setSelectedClass] =
+    useState("")
+
+  const [selectedExam, setSelectedExam] =
+    useState("")
+
+  const [selectedSubject, setSelectedSubject] =
+    useState("")
+
+  const [scores, setScores] =
+    useState<Record<string, number | "">>({})
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [marksLoading, setMarksLoading] =
+    useState(false)
+
+  const [saving, setSaving] =
+    useState(false)
+
+  const [message, setMessage] =
+    useState("")
+
+  const [messageType, setMessageType] =
+    useState<"success" | "error">("success")
+
+  /*
+   * =========================================================
+   * HELPERS
    * =========================================================
    */
 
@@ -143,34 +187,48 @@ export default function MarksPage() {
   function mapMarksData(data: any): Mark[] {
     const marksData = parseArray(data, "marks")
 
-    return marksData.map((item: any) => ({
-      id:
-        item.id != null
-          ? Number(item.id)
-          : undefined,
-      examId: Number(
-        item.examId ?? item.exam_id
-      ),
-      studentId: Number(
-        item.studentId ?? item.student_id
-      ),
-      subjectId: Number(
-        item.subjectId ?? item.subject_id
-      ),
-      score: Number(
-        item.score ?? item.marks ?? 0
-      ),
-    }))
+    return marksData
+      .map((item: any) => ({
+        id:
+          item.id != null
+            ? Number(item.id)
+            : undefined,
+
+        examId: Number(
+          item.examId ??
+            item.exam_id ??
+            0
+        ),
+
+        studentId: Number(
+          item.studentId ??
+            item.student_id ??
+            0
+        ),
+
+        subjectId: Number(
+          item.subjectId ??
+            item.subject_id ??
+            0
+        ),
+
+        score: Number(
+          item.score ??
+            item.marks ??
+            0
+        ),
+      }))
+      .filter(
+        (mark: Mark) =>
+          mark.examId > 0 &&
+          mark.studentId > 0 &&
+          mark.subjectId > 0
+      )
   }
 
   /*
    * =========================================================
-   * LOAD MAIN PAGE DATA
-   *
-   * IMPORTANT:
-   * Marks are deliberately NOT loaded here.
-   * They are loaded separately according to the
-   * selected exam/class.
+   * LOAD MAIN DATA
    * =========================================================
    */
 
@@ -187,200 +245,300 @@ export default function MarksPage() {
         assignmentsRes,
         teachersRes,
       ] = await Promise.all([
-        fetch("/api/students"),
-        fetch("/api/classes"),
-        fetch("/api/subjects"),
-        fetch("/api/exams"),
-        fetch("/api/teacher-subject-assignments"),
-        fetch("/api/teachers"),
+        fetch("/api/students", {
+          cache: "no-store",
+        }),
+
+        fetch("/api/classes", {
+          cache: "no-store",
+        }),
+
+        fetch("/api/subjects", {
+          cache: "no-store",
+        }),
+
+        fetch("/api/exams", {
+          cache: "no-store",
+        }),
+
+        fetch(
+          "/api/teacher-subject-assignments",
+          {
+            cache: "no-store",
+          }
+        ),
+
+        fetch("/api/teachers", {
+          cache: "no-store",
+        }),
       ])
 
       if (!studentsRes.ok) {
-        throw new Error("Failed to load students")
+        throw new Error(
+          "Failed to load students"
+        )
       }
 
       if (!classesRes.ok) {
-        throw new Error("Failed to load classes")
+        throw new Error(
+          "Failed to load classes"
+        )
       }
 
       if (!subjectsRes.ok) {
-        throw new Error("Failed to load subjects")
+        throw new Error(
+          "Failed to load subjects"
+        )
       }
 
       if (!examsRes.ok) {
-        throw new Error("Failed to load exams")
+        throw new Error(
+          "Failed to load exams"
+        )
       }
 
-      const studentsJson = await studentsRes.json()
-      const classesJson = await classesRes.json()
-      const subjectsJson = await subjectsRes.json()
-      const examsJson = await examsRes.json()
+      const studentsJson =
+        await studentsRes.json()
 
-      const assignmentsJson = assignmentsRes.ok
-        ? await assignmentsRes.json()
-        : []
+      const classesJson =
+        await classesRes.json()
 
-      const teachersJson = teachersRes.ok
-        ? await teachersRes.json()
-        : []
+      const subjectsJson =
+        await subjectsRes.json()
 
-      const studentsData = parseArray(
-        studentsJson,
-        "students"
-      )
+      const examsJson =
+        await examsRes.json()
 
-      const classesData = parseArray(
-        classesJson,
-        "classes"
-      )
+      const assignmentsJson =
+        assignmentsRes.ok
+          ? await assignmentsRes.json()
+          : []
 
-      const subjectsData = parseArray(
-        subjectsJson,
-        "subjects"
-      )
+      const teachersJson =
+        teachersRes.ok
+          ? await teachersRes.json()
+          : []
 
-      const examsData = parseArray(
-        examsJson,
-        "exams"
-      )
+      const studentsData =
+        parseArray(
+          studentsJson,
+          "students"
+        )
 
-      const assignmentsData = parseArray(
-        assignmentsJson,
-        "assignments"
-      )
+      const classesData =
+        parseArray(
+          classesJson,
+          "classes"
+        )
 
-      const teachersData = parseArray(
-        teachersJson,
-        "teachers"
-      )
+      const subjectsData =
+        parseArray(
+          subjectsJson,
+          "subjects"
+        )
+
+      const examsData =
+        parseArray(
+          examsJson,
+          "exams"
+        )
+
+      const assignmentsData =
+        parseArray(
+          assignmentsJson,
+          "assignments"
+        )
+
+      const teachersData =
+        parseArray(
+          teachersJson,
+          "teachers"
+        )
 
       setStudents(
-        studentsData.map((student: any) => ({
-          id: Number(student.id),
-          admissionNo: String(
-            student.admissionNo ??
-              student.admission_number ??
-              student.admissionNumber ??
-              ""
-          ),
-          firstName: String(
-            student.firstName ??
-              student.first_name ??
-              ""
-          ),
-          middleName:
-            student.middleName ??
-            student.middle_name ??
-            "",
-          lastName:
-            student.lastName ??
-            student.last_name ??
-            "",
-          classId:
-            student.classId != null
-              ? Number(student.classId)
-              : student.class_id != null
-                ? Number(student.class_id)
-                : undefined,
-          className:
-            student.className ??
-            student.class_name ??
-            "",
-          stream: student.stream ?? "",
-          status:
-            student.status ?? "Active",
-        }))
+        studentsData.map(
+          (student: any) => ({
+            id: Number(student.id),
+
+            admissionNo: String(
+              student.admissionNo ??
+                student.admission_number ??
+                student.admissionNumber ??
+                ""
+            ),
+
+            firstName: String(
+              student.firstName ??
+                student.first_name ??
+                ""
+            ),
+
+            middleName:
+              student.middleName ??
+              student.middle_name ??
+              "",
+
+            lastName:
+              student.lastName ??
+              student.last_name ??
+              "",
+
+            classId:
+              student.classId != null
+                ? Number(
+                    student.classId
+                  )
+                : student.class_id != null
+                  ? Number(
+                      student.class_id
+                    )
+                  : undefined,
+
+            className:
+              student.className ??
+              student.class_name ??
+              "",
+
+            stream:
+              student.stream ?? "",
+
+            status:
+              student.status ??
+              "Active",
+          })
+        )
       )
 
       setSchoolClasses(
-        classesData.map((item: any) => ({
-          id: Number(item.id),
-          name: String(
-            item.name ??
-              item.className ??
-              item.class_name ??
-              ""
-          ),
-          streams: item.streams ?? [],
-          classTeacherId:
-            item.classTeacherId != null
-              ? Number(item.classTeacherId)
-              : item.class_teacher_id != null
+        classesData.map(
+          (item: any) => ({
+            id: Number(item.id),
+
+            name: String(
+              item.name ??
+                item.className ??
+                item.class_name ??
+                ""
+            ),
+
+            streams:
+              item.streams ?? [],
+
+            classTeacherId:
+              item.classTeacherId != null
                 ? Number(
-                    item.class_teacher_id
+                    item.classTeacherId
                   )
-                : undefined,
-        }))
+                : item.class_teacher_id != null
+                  ? Number(
+                      item.class_teacher_id
+                    )
+                  : undefined,
+          })
+        )
       )
 
       setSubjects(
-        subjectsData.map((item: any) => ({
-          id: Number(item.id),
-          name: String(
-            item.name ?? ""
-          ),
-          code: item.code ?? "",
-          category:
-            item.category ?? "",
-        }))
+        subjectsData.map(
+          (item: any) => ({
+            id: Number(item.id),
+
+            name: String(
+              item.name ?? ""
+            ),
+
+            code:
+              item.code ?? "",
+
+            category:
+              item.category ?? "",
+          })
+        )
       )
 
       setExams(
-        examsData.map((item: any) => ({
-          id: Number(item.id),
-          name: String(
-            item.name ??
-              item.examName ??
-              item.exam_name ??
-              ""
-          ),
-          term: item.term ?? "",
-          year:
-            item.year != null
-              ? Number(item.year)
-              : undefined,
-          outOf:
-            item.outOf != null
-              ? Number(item.outOf)
-              : item.out_of != null
-                ? Number(item.out_of)
-                : 100,
-        }))
+        examsData.map(
+          (item: any) => ({
+            id: Number(item.id),
+
+            name: String(
+              item.name ??
+                item.examName ??
+                item.exam_name ??
+                ""
+            ),
+
+            term:
+              item.term ?? "",
+
+            year:
+              item.year != null
+                ? Number(item.year)
+                : undefined,
+
+            outOf:
+              item.outOf != null
+                ? Number(
+                    item.outOf
+                  )
+                : item.out_of != null
+                  ? Number(
+                      item.out_of
+                    )
+                  : 100,
+          })
+        )
       )
 
       setAssignments(
         assignmentsData.map(
           (item: any) => ({
-            assignment_id: Number(
-              item.assignment_id ??
-                item.id
-            ),
-            teacher_id: Number(
-              item.teacher_id ??
-                item.teacherId
-            ),
-            subject_id: Number(
-              item.subject_id ??
-                item.subjectId
-            ),
-            subject_name: String(
-              item.subject_name ??
-                item.subjectName ??
-                ""
-            ),
+            assignment_id:
+              Number(
+                item.assignment_id ??
+                  item.id ??
+                  0
+              ),
+
+            teacher_id:
+              Number(
+                item.teacher_id ??
+                  item.teacherId ??
+                  0
+              ),
+
+            subject_id:
+              Number(
+                item.subject_id ??
+                  item.subjectId ??
+                  0
+              ),
+
+            subject_name:
+              String(
+                item.subject_name ??
+                  item.subjectName ??
+                  ""
+              ),
+
             subject_code:
               item.subject_code ??
               item.subjectCode ??
               "",
-            class_id: Number(
-              item.class_id ??
-                item.classId
-            ),
-            class_name: String(
-              item.class_name ??
-                item.className ??
-                ""
-            ),
+
+            class_id:
+              Number(
+                item.class_id ??
+                  item.classId ??
+                  0
+              ),
+
+            class_name:
+              String(
+                item.class_name ??
+                  item.className ??
+                  ""
+              ),
           })
         )
       )
@@ -389,19 +547,25 @@ export default function MarksPage() {
         teachersData.map(
           (item: any) => ({
             id: Number(item.id),
+
             firstName:
               item.firstName ??
               item.first_name ??
               "",
+
             middleName:
               item.middleName ??
               item.middle_name ??
               "",
+
             lastName:
               item.lastName ??
               item.last_name ??
               "",
-            name: item.name ?? "",
+
+            name:
+              item.name ?? "",
+
             email:
               item.email ?? "",
           })
@@ -427,12 +591,22 @@ export default function MarksPage() {
 
   /*
    * =========================================================
-   * LOAD ONLY MARKS FOR SELECTED EXAM + CLASS
+   * LOAD MARKS FOR SELECTED EXAM
+   *
+   * IMPORTANT:
+   * We deliberately load by exam only.
+   *
+   * This allows the historical Grade 7 marks
+   * to be displayed even if the class_id/student
+   * relationship differs between the marks and
+   * students tables.
    * =========================================================
    */
 
-  async function loadMarks() {
-    if (!selectedExam) {
+  async function loadMarks(
+    examIdValue = selectedExam
+  ) {
+    if (!examIdValue) {
       setMarks([])
       return
     }
@@ -445,15 +619,8 @@ export default function MarksPage() {
 
       params.set(
         "examId",
-        selectedExam
+        String(examIdValue)
       )
-
-      if (selectedClass) {
-        params.set(
-          "classId",
-          selectedClass
-        )
-      }
 
       const response =
         await fetch(
@@ -468,17 +635,23 @@ export default function MarksPage() {
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
+          data?.error ??
             "Failed to load marks"
         )
       }
 
-      setMarks(
+      const loadedMarks =
         mapMarksData(data)
+
+      console.log(
+        "MARKS LOADED:",
+        loadedMarks.length
       )
+
+      setMarks(loadedMarks)
     } catch (error) {
       console.error(
-        "Failed to load selected marks:",
+        "Failed to load marks:",
         error
       )
 
@@ -497,29 +670,88 @@ export default function MarksPage() {
   }
 
   /*
-   * Initial page load.
+   * =========================================================
+   * INITIAL LOAD
+   * =========================================================
    */
+
   useEffect(() => {
     loadData()
   }, [])
 
   /*
-   * Load only the marks needed for the
-   * selected exam/class.
+   * =========================================================
+   * AUTOMATICALLY SELECT GRADE 7 + MID-TERM 2026
+   * =========================================================
    */
+
   useEffect(() => {
-    if (!loading) {
-      loadMarks()
+    if (
+      schoolClasses.length === 0 ||
+      exams.length === 0
+    ) {
+      return
+    }
+
+    if (!selectedClass) {
+      const grade7 =
+        schoolClasses.find(
+          (schoolClass) =>
+            normalize(
+              schoolClass.name
+            ) === "grade 7"
+        )
+
+      if (grade7) {
+        setSelectedClass(
+          String(grade7.id)
+        )
+      }
+    }
+
+    if (!selectedExam) {
+      const midTerm2026 =
+        exams.find(
+          (exam) =>
+            normalize(
+              exam.name
+            ) ===
+              "mid-term exam" &&
+            Number(exam.year) ===
+              2026
+        )
+
+      if (midTerm2026) {
+        setSelectedExam(
+          String(midTerm2026.id)
+        )
+      }
+    }
+  }, [
+    schoolClasses,
+    exams,
+    selectedClass,
+    selectedExam,
+  ])
+
+  /*
+   * =========================================================
+   * LOAD MARKS WHEN EXAM CHANGES
+   * =========================================================
+   */
+
+  useEffect(() => {
+    if (!loading && selectedExam) {
+      loadMarks(selectedExam)
     }
   }, [
     selectedExam,
-    selectedClass,
     loading,
   ])
 
   /*
    * =========================================================
-   * CLASS DATA
+   * CLASSES
    * =========================================================
    */
 
@@ -544,7 +776,9 @@ export default function MarksPage() {
       return student.className
     }
 
-    if (student.classId != null) {
+    if (
+      student.classId != null
+    ) {
       const found =
         schoolClasses.find(
           (item) =>
@@ -559,6 +793,12 @@ export default function MarksPage() {
 
     return ""
   }
+
+  /*
+   * =========================================================
+   * STUDENTS IN SELECTED CLASS
+   * =========================================================
+   */
 
   const classStudents = useMemo(() => {
     if (!selectedClass) {
@@ -781,8 +1021,7 @@ export default function MarksPage() {
           )
 
         if (
-          juniorSubjects.length >
-          0
+          juniorSubjects.length > 0
         ) {
           return juniorSubjects
         }
@@ -799,16 +1038,22 @@ export default function MarksPage() {
     ])
 
   /*
-   * Reset subject when class changes.
+   * =========================================================
+   * RESET SUBJECT WHEN CLASS CHANGES
+   * =========================================================
    */
+
   useEffect(() => {
     setSelectedSubject("")
     setScores({})
   }, [selectedClass])
 
   /*
-   * Make sure selected subject remains valid.
+   * =========================================================
+   * KEEP SUBJECT VALID
+   * =========================================================
    */
+
   useEffect(() => {
     if (
       selectedSubject &&
@@ -825,6 +1070,12 @@ export default function MarksPage() {
     selectedSubject,
     availableSubjects,
   ])
+
+  /*
+   * =========================================================
+   * SELECTED SUBJECT / EXAM
+   * =========================================================
+   */
 
   const selectedSubjectObject =
     useMemo(() => {
@@ -852,19 +1103,13 @@ export default function MarksPage() {
 
   /*
    * =========================================================
-   * FAST MARK LOOKUP
+   * FAST MARK MAP
    * =========================================================
-   *
-   * Instead of repeatedly doing marks.find(...),
-   * create a Map once.
    */
 
   const markMap = useMemo(() => {
     const map =
-      new Map<
-        string,
-        Mark
-      >()
+      new Map<string, Mark>()
 
     for (const mark of marks) {
       map.set(
@@ -893,7 +1138,7 @@ export default function MarksPage() {
 
   /*
    * =========================================================
-   * LOAD EXISTING SCORES INTO INPUTS
+   * LOAD EXISTING SUBJECT SCORES
    * =========================================================
    */
 
@@ -908,12 +1153,13 @@ export default function MarksPage() {
       return
     }
 
-    const nextScores: Record<
-      string,
-      number | ""
-    > = {}
+    const nextScores:
+      Record<string, number | ""> =
+      {}
 
-    for (const student of classStudents) {
+    for (
+      const student of classStudents
+    ) {
       const existingMark =
         markMap.get(
           markLookupKey(
@@ -953,16 +1199,20 @@ export default function MarksPage() {
     studentId: number,
     value: string
   ) {
-    const key = scoreKey(
-      studentId,
-      Number(selectedSubject)
-    )
+    const key =
+      scoreKey(
+        studentId,
+        Number(selectedSubject)
+      )
 
     if (value === "") {
-      setScores((previous) => ({
-        ...previous,
-        [key]: "",
-      }))
+      setScores(
+        (previous) => ({
+          ...previous,
+          [key]: "",
+        })
+      )
+
       return
     }
 
@@ -986,10 +1236,13 @@ export default function MarksPage() {
         )
       )
 
-    setScores((previous) => ({
-      ...previous,
-      [key]: numericValue,
-    }))
+    setScores(
+      (previous) => ({
+        ...previous,
+        [key]:
+          numericValue,
+      })
+    )
   }
 
   /*
@@ -1003,6 +1256,7 @@ export default function MarksPage() {
       setMessage(
         "Please select a class."
       )
+
       setMessageType("error")
       return
     }
@@ -1011,6 +1265,7 @@ export default function MarksPage() {
       setMessage(
         "Please select an exam."
       )
+
       setMessageType("error")
       return
     }
@@ -1019,6 +1274,7 @@ export default function MarksPage() {
       setMessage(
         "Please select a subject."
       )
+
       setMessageType("error")
       return
     }
@@ -1029,6 +1285,7 @@ export default function MarksPage() {
       setMessage(
         "There are no students in the selected class."
       )
+
       setMessageType("error")
       return
     }
@@ -1056,11 +1313,14 @@ export default function MarksPage() {
           return {
             studentId:
               student.id,
+
             subjectId:
               Number(
                 selectedSubject
               ),
-            score: Number(value),
+
+            score:
+              Number(value),
           }
         })
         .filter(
@@ -1070,7 +1330,8 @@ export default function MarksPage() {
             studentId: number
             subjectId: number
             score: number
-          } => entry !== null
+          } =>
+            entry !== null
         )
 
     if (
@@ -1079,6 +1340,7 @@ export default function MarksPage() {
       setMessage(
         "Please enter at least one mark."
       )
+
       setMessageType("error")
       return
     }
@@ -1087,26 +1349,25 @@ export default function MarksPage() {
       setSaving(true)
       setMessage("")
 
-      /*
-       * IMPORTANT:
-       * examId belongs at the top level because
-       * /api/marks reads body.examId.
-       */
       const response =
         await fetch(
           "/api/marks",
           {
             method: "POST",
+
             headers: {
               "Content-Type":
                 "application/json",
             },
+
             body: JSON.stringify({
               examId:
                 Number(
                   selectedExam
                 ),
-              marks: entries,
+
+              marks:
+                entries,
             }),
           }
         )
@@ -1116,7 +1377,7 @@ export default function MarksPage() {
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
+          data?.error ??
             "Failed to save marks"
         )
       }
@@ -1131,11 +1392,9 @@ export default function MarksPage() {
 
       setMessageType("success")
 
-      /*
-       * Reload only marks for the current
-       * exam/class.
-       */
-      await loadMarks()
+      await loadMarks(
+        selectedExam
+      )
     } catch (error) {
       console.error(
         "Failed to save marks:",
@@ -1254,34 +1513,36 @@ export default function MarksPage() {
         }
       )
 
-    const csv = [
-      header,
-      ...rows,
-    ]
-      .map((row) =>
-        row
-          .map((value) => {
-            const text =
-              String(
-                value ?? ""
-              )
+    const csv =
+      [
+        header,
+        ...rows,
+      ]
+        .map((row) =>
+          row
+            .map((value) => {
+              const text =
+                String(
+                  value ?? ""
+                )
 
-            return `"${text.replace(
-              /"/g,
-              '""'
-            )}"`
-          })
-          .join(",")
+              return `"${text.replace(
+                /"/g,
+                '""'
+              )}"`
+            })
+            .join(",")
+        )
+        .join("\n")
+
+    const blob =
+      new Blob(
+        [csv],
+        {
+          type:
+            "text/csv;charset=utf-8;",
+        }
       )
-      .join("\n")
-
-    const blob = new Blob(
-      [csv],
-      {
-        type:
-          "text/csv;charset=utf-8;",
-      }
-    )
 
     const url =
       URL.createObjectURL(
@@ -1315,7 +1576,7 @@ export default function MarksPage() {
 
   /*
    * =========================================================
-   * PAST RESULTS SUBJECTS
+   * RESULT SUBJECTS
    * =========================================================
    */
 
@@ -1366,8 +1627,7 @@ export default function MarksPage() {
                   "junior school" ||
                 normalize(
                   subject.category
-                ) ===
-                  "junior"
+                ) === "junior"
             )
             .sort(
               (a, b) =>
@@ -1394,7 +1654,7 @@ export default function MarksPage() {
 
   /*
    * =========================================================
-   * PAST RESULTS ROWS
+   * PAST RESULTS
    * =========================================================
    */
 
@@ -1415,16 +1675,20 @@ export default function MarksPage() {
       const rows =
         classStudents.map(
           (student) => {
-            const subjectScores: Record<
-              number,
-              number | null
-            > = {}
+            const subjectScores:
+              Record<
+                number,
+                number | null
+              > = {}
 
             let total = 0
+
             let completedSubjects =
               0
 
-            for (const subject of resultSubjects) {
+            for (
+              const subject of resultSubjects
+            ) {
               const existingMark =
                 markMap.get(
                   markLookupKey(
@@ -1465,9 +1729,10 @@ export default function MarksPage() {
         )
 
       /*
-       * Rank only learners who have marks
-       * in every subject.
+       * Only complete learners receive
+       * an academic position.
        */
+
       const completeRows =
         rows
           .filter(
@@ -1483,8 +1748,7 @@ export default function MarksPage() {
       let previousTotal:
         number | null = null
 
-      let previousPosition =
-        0
+      let previousPosition = 0
 
       completeRows.forEach(
         (row, index) => {
@@ -1565,8 +1829,10 @@ export default function MarksPage() {
             return 1
           }
 
-          return a.student.firstName.localeCompare(
-            b.student.firstName
+          return (
+            a.student.firstName.localeCompare(
+              b.student.firstName
+            )
           )
         })
     }, [
@@ -1579,7 +1845,7 @@ export default function MarksPage() {
 
   /*
    * =========================================================
-   * DOWNLOAD COMPLETE RESULTS
+   * DOWNLOAD RESULTS
    * =========================================================
    */
 
@@ -1619,10 +1885,12 @@ export default function MarksPage() {
       "Position",
       "Admission No",
       "Student Name",
+
       ...resultSubjects.map(
         (subject) =>
           subject.name
       ),
+
       "Total",
       "Subjects Completed",
     ]
@@ -1648,46 +1916,50 @@ export default function MarksPage() {
             row.position ?? "",
             row.student.admissionNo,
             studentName,
+
             ...resultSubjects.map(
               (subject) =>
                 row.subjectScores[
                   subject.id
                 ] ?? ""
             ),
+
             row.total,
             row.completedSubjects,
           ]
         }
       )
 
-    const csv = [
-      header,
-      ...rows,
-    ]
-      .map((row) =>
-        row
-          .map((value) => {
-            const text =
-              String(
-                value ?? ""
-              )
+    const csv =
+      [
+        header,
+        ...rows,
+      ]
+        .map((row) =>
+          row
+            .map((value) => {
+              const text =
+                String(
+                  value ?? ""
+                )
 
-            return `"${text.replace(
-              /"/g,
-              '""'
-            )}"`
-          })
-          .join(",")
+              return `"${text.replace(
+                /"/g,
+                '""'
+              )}"`
+            })
+            .join(",")
+        )
+        .join("\n")
+
+    const blob =
+      new Blob(
+        [csv],
+        {
+          type:
+            "text/csv;charset=utf-8;",
+        }
       )
-      .join("\n")
-
-    const blob = new Blob(
-      [csv],
-      {
-        type:
-          "text/csv;charset=utf-8;",
-      }
-    )
 
     const url =
       URL.createObjectURL(
@@ -1719,6 +1991,22 @@ export default function MarksPage() {
     URL.revokeObjectURL(url)
   }
 
+  /*
+   * =========================================================
+   * REFRESH
+   * =========================================================
+   */
+
+  async function refreshPage() {
+    await loadData()
+
+    if (selectedExam) {
+      await loadMarks(
+        selectedExam
+      )
+    }
+  }
+
   const canSaveMarks =
     isAdmin || isTeacher
 
@@ -1746,7 +2034,10 @@ export default function MarksPage() {
         </Card>
       ) : (
         <>
-          {/* MARKS SELECTION */}
+          {/* =================================================
+              MARKS SELECTION
+          ================================================= */}
+
           <Card>
             <CardHeader>
               <CardTitle>
@@ -1762,10 +2053,15 @@ export default function MarksPage() {
                   </label>
 
                   <select
-                    value={selectedClass}
-                    onChange={(event) =>
+                    value={
+                      selectedClass
+                    }
+                    onChange={(
+                      event
+                    ) =>
                       setSelectedClass(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     }
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -1775,7 +2071,9 @@ export default function MarksPage() {
                     </option>
 
                     {classes.map(
-                      (schoolClass) => (
+                      (
+                        schoolClass
+                      ) => (
                         <option
                           key={
                             schoolClass.id
@@ -1799,10 +2097,15 @@ export default function MarksPage() {
                   </label>
 
                   <select
-                    value={selectedExam}
-                    onChange={(event) =>
+                    value={
+                      selectedExam
+                    }
+                    onChange={(
+                      event
+                    ) =>
                       setSelectedExam(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     }
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -1814,13 +2117,19 @@ export default function MarksPage() {
                     {exams.map(
                       (exam) => (
                         <option
-                          key={exam.id}
-                          value={exam.id}
+                          key={
+                            exam.id
+                          }
+                          value={
+                            exam.id
+                          }
                         >
                           {exam.name}
+
                           {exam.term
                             ? ` - ${exam.term}`
                             : ""}
+
                           {exam.year
                             ? ` ${exam.year}`
                             : ""}
@@ -1839,9 +2148,12 @@ export default function MarksPage() {
                     value={
                       selectedSubject
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event
+                    ) =>
                       setSelectedSubject(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     }
                     disabled={
@@ -1876,10 +2188,9 @@ export default function MarksPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => {
-                      loadData()
-                      loadMarks()
-                    }}
+                    onClick={
+                      refreshPage
+                    }
                     className="w-full"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
@@ -1912,7 +2223,10 @@ export default function MarksPage() {
             </CardContent>
           </Card>
 
-          {/* CLASS STATS */}
+          {/* =================================================
+              CLASS STATS
+          ================================================= */}
+
           {selectedClass && (
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
@@ -1980,7 +2294,10 @@ export default function MarksPage() {
             </div>
           )}
 
-          {/* MARKS ENTRY */}
+          {/* =================================================
+              MARKS ENTRY
+          ================================================= */}
+
           {selectedClass &&
             selectedExam &&
             selectedSubject && (
@@ -2003,6 +2320,7 @@ export default function MarksPage() {
                         {selectedExamObject?.term
                           ? `• ${selectedExamObject.term}`
                           : ""}
+
                         {selectedExamObject?.year
                           ? ` • ${selectedExamObject.year}`
                           : ""}
@@ -2072,8 +2390,7 @@ export default function MarksPage() {
                       <div className="flex items-center justify-center gap-2">
                         <RefreshCw className="h-4 w-4 animate-spin" />
                         Loading marks for
-                        this class and
-                        exam...
+                        this exam...
                       </div>
                     </div>
                   ) : classStudents.length ===
@@ -2198,7 +2515,10 @@ export default function MarksPage() {
               </Card>
             )}
 
-          {/* PAST RESULTS */}
+          {/* =================================================
+              PAST RESULTS
+          ================================================= */}
+
           {isAdmin &&
             selectedClass &&
             selectedExam && (
@@ -2227,6 +2547,7 @@ export default function MarksPage() {
                         {selectedExamObject?.term
                           ? `• ${selectedExamObject.term}`
                           : ""}
+
                         {selectedExamObject?.year
                           ? ` • ${selectedExamObject.year}`
                           : ""}
@@ -2251,6 +2572,72 @@ export default function MarksPage() {
                 </CardHeader>
 
                 <CardContent>
+                  {/* DATABASE DIAGNOSTIC */}
+
+                  <div className="mb-4 rounded-md border bg-muted/30 p-3 text-sm">
+                    <div className="grid gap-2 md:grid-cols-5">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Role:
+                        </span>{" "}
+                        <strong>
+                          {normalizedRole ||
+                            "unknown"}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Learners:
+                        </span>{" "}
+                        <strong>
+                          {
+                            classStudents.length
+                          }
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Marks loaded:
+                        </span>{" "}
+                        <strong>
+                          {
+                            marks.length
+                          }
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Subjects:
+                        </span>{" "}
+                        <strong>
+                          {
+                            resultSubjects.length
+                          }
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Complete:
+                        </span>{" "}
+                        <strong>
+                          {
+                            resultRows.filter(
+                              (
+                                row
+                              ) =>
+                                row.completedSubjects ===
+                                resultSubjects.length
+                            ).length
+                          }
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
                   {marksLoading ? (
                     <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
                       <div className="flex items-center justify-center gap-2">
@@ -2261,13 +2648,38 @@ export default function MarksPage() {
                     </div>
                   ) : resultRows.length ===
                     0 ? (
-                    <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
-                      No past results
-                      found for this
-                      class and exam.
+                    <div className="rounded-md border p-8 text-center">
+                      <p className="font-medium">
+                        No past results found
+                      </p>
+
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Exam:{" "}
+                        {
+                          selectedExamObject?.name
+                        }
+
+                        {selectedExamObject?.term
+                          ? ` • ${selectedExamObject.term}`
+                          : ""}
+
+                        {selectedExamObject?.year
+                          ? ` • ${selectedExamObject.year}`
+                          : ""}
+                      </p>
+
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Marks loaded from
+                        database:{" "}
+                        {
+                          marks.length
+                        }
+                      </p>
                     </div>
                   ) : (
                     <>
+                      {/* RESULT STATISTICS */}
+
                       <div className="mb-4 grid gap-4 md:grid-cols-4">
                         <div className="rounded-md border p-4">
                           <p className="text-sm text-muted-foreground">
@@ -2332,11 +2744,13 @@ export default function MarksPage() {
                         </div>
                       </div>
 
+                      {/* RESULT TABLE */}
+
                       <div className="overflow-x-auto rounded-md border">
-                        <table className="w-full min-w-[1100px] text-sm">
+                        <table className="w-full min-w-[1250px] text-sm">
                           <thead className="bg-muted/50">
                             <tr>
-                              <th className="sticky left-0 bg-muted/50 px-3 py-3 text-left font-medium">
+                              <th className="sticky left-0 z-10 bg-muted/50 px-3 py-3 text-left font-medium">
                                 Pos
                               </th>
 
@@ -2344,7 +2758,7 @@ export default function MarksPage() {
                                 Admission No
                               </th>
 
-                              <th className="sticky left-[55px] bg-muted/50 px-3 py-3 text-left font-medium">
+                              <th className="sticky left-[55px] z-10 bg-muted/50 px-3 py-3 text-left font-medium">
                                 Learner
                               </th>
 
@@ -2411,7 +2825,7 @@ export default function MarksPage() {
                                     }
                                     className="border-t"
                                   >
-                                    <td className="sticky left-0 bg-background px-3 py-3 font-bold">
+                                    <td className="sticky left-0 z-10 bg-background px-3 py-3 font-bold">
                                       {row.position ??
                                         "—"}
                                     </td>
@@ -2423,7 +2837,7 @@ export default function MarksPage() {
                                       }
                                     </td>
 
-                                    <td className="sticky left-[55px] bg-background px-3 py-3 font-medium">
+                                    <td className="sticky left-[55px] z-10 bg-background px-3 py-3 font-medium">
                                       {
                                         studentName
                                       }
@@ -2436,8 +2850,7 @@ export default function MarksPage() {
                                         const score =
                                           row
                                             .subjectScores[
-                                            subject
-                                              .id
+                                            subject.id
                                           ]
 
                                         return (
@@ -2488,16 +2901,14 @@ export default function MarksPage() {
                         <strong>
                           Note:
                         </strong>{" "}
-                        Position is
-                        calculated only
-                        for learners who
-                        have marks
-                        recorded in every
-                        subject for the
-                        selected exam.
-                        Equal totals
-                        receive the same
-                        position.
+                        Position is calculated
+                        only for learners who
+                        have marks in every
+                        subject for the selected
+                        exam. Equal totals receive
+                        the same position. Learners
+                        without complete results
+                        remain unranked.
                       </div>
                     </>
                   )}
@@ -2509,3 +2920,4 @@ export default function MarksPage() {
     </div>
   )
 }
+
