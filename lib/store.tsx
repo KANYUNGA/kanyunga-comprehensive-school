@@ -845,8 +845,7 @@ export function SchoolProvider({
         'Failed to create student'
       )
     }
-
-    await loadData()
+await loadStudentsOnly()
   }
 
   const updateStudent =
@@ -879,7 +878,7 @@ export function SchoolProvider({
         )
       }
 
-      await loadData()
+      await loadStudentsOnly()
     }
 
   const deleteStudent =
@@ -902,7 +901,7 @@ export function SchoolProvider({
         )
       }
 
-      await loadData()
+     await loadStudentsOnly()
     }
 
   const addTeacher = async (
