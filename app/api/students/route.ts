@@ -5,7 +5,7 @@ const sql = getDb()
 
 function safeString(value: unknown): string {
   if (value === null || value === undefined) return ""
-  return String(value)
+  return String(value).trim()
 }
 
 function formatDate(value: unknown): string {
@@ -15,40 +15,40 @@ function formatDate(value: unknown): string {
     return value.toISOString().slice(0, 10)
   }
 
-  const text = String(value)
-
-  if (text.length >= 10) {
-    return text.slice(0, 10)
-  }
-
-  return text
+  return String(value).slice(0, 10)
 }
 
-function mapStudent(student: any) {
+function mapStudent(row: any) {
   return {
-    id: String(student.id),
-    admissionNo: safeString(student.admission_number),
-    firstName: safeString(student.first_name),
-    middleName: safeString(student.middle_name),
-    lastName: safeString(student.last_name),
-    gender: safeString(student.gender),
-    classId: safeString(student.class_name),
-    className: safeString(student.class_name),
-    stream: safeString(student.stream),
-    dateOfBirth: formatDate(student.date_of_birth),
-    guardianName: safeString(student.parent_name),
-    guardianPhone: safeString(student.parent_phone),
-    address: safeString(student.address),
-    email: safeString(student.email),
-    admissionDate: formatDate(student.admission_date),
-    status: safeString(student.status) || "Active",
-    photoUrl: safeString(student.photo_url),
+    id: Number(row.id),
+    admissionNo: safeString(row.admission_number),
+    firstName: safeString(row.first_name),
+    middleName: safeString(row.middle_name),
+    lastName: safeString(row.last_name),
+    gender: safeString(row.gender) || "Male",
+
+    classId: safeString(row.class_name),
+    className: safeString(row.class_name),
+
+    stream: safeString(row.stream),
+
+    dateOfBirth: formatDate(row.date_of_birth),
+
+    guardianName: safeString(row.parent_name),
+    guardianPhone: safeString(row.parent_phone),
+
+    address: safeString(row.address),
+    email: safeString(row.email),
+
+    admissionDate: formatDate(row.admission_date),
+
+    status: safeString(row.status) || "Active",
+
+    // IMPORTANT:
+    // Do not send the Base64 photo here.
+    hasPhoto: Boolean(row.has_photo),
   }
 }
-
-/* =========================================================
-   GET ALL STUDENTS
-   ========================================================= */
 
 export async function GET() {
   try {
@@ -66,10 +66,17 @@ export async function GET() {
         parent_name,
         parent_phone,
         address,
+        email,
         admission_date,
         status,
-        photo_url,
-        created_at
+
+        CASE
+          WHEN photo_url IS NOT NULL
+            AND LENGTH(TRIM(photo_url)) > 0
+          THEN true
+          ELSE false
+        END AS has_photo
+
       FROM students
       ORDER BY
         first_name ASC,
@@ -77,34 +84,20 @@ export async function GET() {
         id ASC
     `
 
-    const mappedStudents = students.map((student: any) =>
-      mapStudent(student)
-    )
-
-    return Response.json({
-      success: true,
-      count: mappedStudents.length,
-      students: mappedStudents,
-    })
+    return Response.json(students.map(mapStudent))
   } catch (error) {
-    console.error("FAILED TO LOAD STUDENTS:", error)
+    console.error("Failed to fetch students:", error)
 
     return Response.json(
       {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : String(error),
+        error: "Failed to fetch students",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     )
   }
 }
-
-/* =========================================================
-   CREATE STUDENT
-   ========================================================= */
 
 export async function POST(request: Request) {
   const auth = await requireAdmin()
@@ -116,67 +109,86 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    const admissionNo = safeString(body.admissionNo).trim()
-    const firstName = safeString(body.firstName).trim()
-    const middleName = safeString(body.middleName).trim()
-    const lastName = safeString(body.lastName).trim()
-    const gender = safeString(body.gender).trim()
+    const admissionNo = safeString(body.admissionNo)
+    const firstName = safeString(body.firstName)
+    const middleName = safeString(body.middleName)
+    const lastName = safeString(body.lastName)
+    const gender = safeString(body.gender) || "Male"
+    const className =
+      safeString(body.className) ||
+      safeString(body.classId)
 
-    const className = safeString(
-      body.className ?? body.classId
-    ).trim()
+    const stream = safeString(body.stream)
 
-    const stream = safeString(body.stream).trim()
-    const dateOfBirth = safeString(body.dateOfBirth).trim()
+    const dateOfBirth =
+      safeString(body.dateOfBirth) || null
 
-    const guardianName = safeString(
-      body.guardianName
-    ).trim()
+    const guardianName =
+      safeString(body.guardianName)
 
-    const guardianPhone = safeString(
-      body.guardianPhone
-    ).trim()
+    const guardianPhone =
+      safeString(body.guardianPhone)
 
-    const address = safeString(body.address).trim()
-    const admissionDate = safeString(
-      body.admissionDate
-    ).trim()
+    const address =
+      safeString(body.address)
+
+    const email =
+      safeString(body.email)
+
+    const admissionDate =
+      safeString(body.admissionDate) || null
 
     const status =
-      safeString(body.status).trim() || "Active"
+      safeString(body.status) || "Active"
 
-    const photoUrl = safeString(body.photoUrl).trim()
+    const photoUrl =
+      safeString(body.photoUrl) || null
 
     if (!admissionNo) {
       return Response.json(
         {
-          success: false,
-          error: "Admission number is required",
+          error: "Admission number is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       )
     }
 
     if (!firstName) {
       return Response.json(
         {
-          success: false,
-          error: "First name is required",
+          error: "First name is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       )
     }
 
     if (!lastName) {
       return Response.json(
         {
-          success: false,
-          error: "Last name is required",
+          error: "Last name is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       )
     }
 
+    if (!className) {
+      return Response.json(
+        {
+          error: "Class is required.",
+        },
+        {
+          status: 400,
+        }
+      )
+    }
+
+    // Prevent duplicate admission numbers.
     const existing = await sql`
       SELECT id
       FROM students
@@ -187,14 +199,15 @@ export async function POST(request: Request) {
     if (existing.length > 0) {
       return Response.json(
         {
-          success: false,
-          error: `Admission number ${admissionNo} already exists`,
+          error: `Admission number ${admissionNo} already exists.`,
         },
-        { status: 409 }
+        {
+          status: 409,
+        }
       )
     }
 
-    const result = await sql`
+    const inserted = await sql`
       INSERT INTO students (
         admission_number,
         first_name,
@@ -207,6 +220,7 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
+        email,
         admission_date,
         status,
         photo_url
@@ -217,15 +231,16 @@ export async function POST(request: Request) {
         ${middleName},
         ${lastName},
         ${gender},
-        ${dateOfBirth || null},
+        ${dateOfBirth},
         ${className},
         ${stream},
         ${guardianName},
         ${guardianPhone},
         ${address},
-        ${admissionDate || null},
+        ${email},
+        ${admissionDate},
         ${status},
-        ${photoUrl || null}
+        ${photoUrl}
       )
       RETURNING
         id,
@@ -240,33 +255,33 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
+        email,
         admission_date,
         status,
-        photo_url,
-        created_at
+        CASE
+          WHEN photo_url IS NOT NULL
+            AND LENGTH(TRIM(photo_url)) > 0
+          THEN true
+          ELSE false
+        END AS has_photo
     `
 
-    const student = result[0]
-
     return Response.json(
+      mapStudent(inserted[0]),
       {
-        success: true,
-        student: mapStudent(student),
-      },
-      { status: 201 }
+        status: 201,
+      }
     )
   } catch (error) {
-    console.error("FAILED TO CREATE STUDENT:", error)
+    console.error("Failed to add student:", error)
 
     return Response.json(
       {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : String(error),
+        error: "Failed to add student.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     )
   }
-  }
+}
