@@ -1,5 +1,3 @@
-'use client'
-
 import {
   createContext,
   useContext,
@@ -33,6 +31,8 @@ export type CurrentUser = {
 
 type StudentWithPhoto = Student & {
   photoUrl?: string
+  hasPhoto?: boolean
+  email?: string
 }
 
 type LoginData = {
@@ -88,6 +88,19 @@ type SchoolContextValue = {
 const SchoolContext =
   createContext<SchoolContextValue | null>(null)
 
+/*
+ * -------------------------------------------------------
+ * STUDENT MAPPER
+ * -------------------------------------------------------
+ *
+ * Converts the API/database format into the format used
+ * throughout the application.
+ *
+ * IMPORTANT:
+ * hasPhoto is only a boolean.
+ * The actual Base64 photo is NOT loaded with the student
+ * list.
+ */
 function mapStudent(student: any): StudentWithPhoto {
   return {
     id: String(student.id),
@@ -152,6 +165,13 @@ function mapStudent(student: any): StudentWithPhoto {
       student.address ??
       '',
 
+    /*
+     * Student email was previously missing here.
+     */
+    email:
+      student.email ??
+      '',
+
     admissionDate:
       student.admissionDate ??
       student.admission_date ??
@@ -166,13 +186,25 @@ function mapStudent(student: any): StudentWithPhoto {
       student.created_at ??
       '',
 
+    /*
+     * The lightweight /api/students endpoint normally
+     * does not return the actual photo.
+     */
     photoUrl:
       student.photoUrl ??
       student.photo_url ??
       '',
+
+    hasPhoto:
+      Boolean(student.hasPhoto),
   }
 }
 
+/*
+ * -------------------------------------------------------
+ * TEACHER MAPPER
+ * -------------------------------------------------------
+ */
 function mapTeacher(teacher: any): Teacher {
   return {
     id: String(teacher.id),
@@ -206,12 +238,16 @@ function mapTeacher(teacher: any): Teacher {
 
     subjectIds:
       teacher.subjectIds ??
-      (teacher.subject
-        ? String(teacher.subject)
-            .split(',')
-            .map((s: string) => s.trim())
-            .filter(Boolean)
-        : []),
+      (
+        teacher.subject
+          ? String(teacher.subject)
+              .split(',')
+              .map(
+                (s: string) => s.trim()
+              )
+              .filter(Boolean)
+          : []
+      ),
 
     employmentDate:
       teacher.employmentDate ??
@@ -224,54 +260,66 @@ function mapTeacher(teacher: any): Teacher {
   }
 }
 
+/*
+ * -------------------------------------------------------
+ * CONNECT STUDENTS TO CLASSES
+ * -------------------------------------------------------
+ */
 function connectStudentsToClasses(
   students: StudentWithPhoto[],
   classes: any[]
 ): StudentWithPhoto[] {
+  const normalizeClassName = (
+    value: string
+  ) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '')
+
   return students.map((student) => {
     const className = String(
       student.className ||
-      student.classId ||
-      ''
+        student.classId ||
+        ''
     ).trim()
 
     if (!className) {
       return student
     }
 
-    const matchingClass = classes.find((cls: any) => {
-      const name = String(
-        cls.name ??
-        cls.className ??
-        cls.class_name ??
-        ''
-      ).trim()
+    const matchingClass =
+      classes.find((cls: any) => {
+        const name = String(
+          cls.name ??
+            cls.className ??
+            cls.class_name ??
+            ''
+        ).trim()
 
-     const normalizeClassName = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '')
+        return (
+          normalizeClassName(name) ===
+          normalizeClassName(className)
+        )
+      })
 
-return (
-  normalizeClassName(name) ===
-  normalizeClassName(className)
-)
-    })
-
+    /*
+     * If the class does not yet exist in the classes
+     * table, preserve the student's class name.
+     */
     if (!matchingClass) {
       return {
         ...student,
         classId: className,
-        className: className,
+        className,
       }
     }
 
     const matchedName = String(
       matchingClass.name ??
-      matchingClass.className ??
-      matchingClass.class_name ??
-      className
+        matchingClass.className ??
+        matchingClass.class_name ??
+        className
     ).trim()
 
     return {
@@ -283,15 +331,9 @@ return (
 }
 
 /*
- * Safely extracts an array from different API response formats.
- *
- * Supported:
- *   [...]
- *   { data: [...] }
- *   { students: [...] }
- *   { teachers: [...] }
- *   { classes: [...] }
- *   etc.
+ * -------------------------------------------------------
+ * SAFE API ARRAY READER
+ * -------------------------------------------------------
  */
 function getApiArray(
   json: any,
@@ -315,81 +357,54 @@ function getApiArray(
   return []
 }
 
+/*
+ * -------------------------------------------------------
+ * SCHOOL PROVIDER
+ * -------------------------------------------------------
+ */
 export function SchoolProvider({
   children,
 }: {
   children: ReactNode
 }) {
-  const loadStudentsOnly = async () => {
-  try {
-    const response = await fetch(
-      "/api/students",
-      {
-        cache: "no-store",
-      }
-    )
-
-    if (!response.ok) {
-      throw new Error(
-        "Failed to fetch students"
-      )
-    }
-
-    const json = await response.json()
-
-    const studentsArray = Array.isArray(json)
-      ? json
-      : Array.isArray(json?.students)
-        ? json.students
-        : Array.isArray(json?.data)
-          ? json.data
-          : []
-
-    const mappedStudents =
-      studentsArray.map(mapStudent)
-
-    setStudents(
-      connectStudentsToClasses(
-        mappedStudents,
-        classes
-      )
-    )
-  } catch (error) {
-    console.error(
-      "Failed to refresh students:",
-      error
-    )
-  }
-}
-  /*
-   * IMPORTANT:
-   * No demo/sample data is generated here.
-   *
-   * All school records must come from the database APIs.
-   */
   const [data, setData] =
     useState<SchoolData>({
       school: {
         name:
           'Kanyunga Comprehensive School',
+
         motto: '',
+
         address: '',
+
         phone: '',
+
         email: '',
+
         logo: '',
+
         currentTerm: '',
+
         year:
           new Date().getFullYear(),
       },
 
       students: [],
+
       teachers: [],
+
       classes: [],
+
       subjects: [],
+
       exams: [],
+
       marks: [],
+
       attendance: [],
+
       payments: [],
+
       fees: [],
     })
 
@@ -401,295 +416,496 @@ export function SchoolProvider({
 
   const [loggedIn, setLoggedIn] =
     useState(false)
-  useEffect(() => {
-  console.log('🏫 SCHOOL PROVIDER MOUNTED')
-  
-  return () => {
-    console.log('🏫 SCHOOL PROVIDER UNMOUNTED')
-  }
-}, [])
 
-  
- const loadData = async () => {
+  /*
+   * -----------------------------------------------------
+   * GENERIC API FETCHER
+   * -----------------------------------------------------
+   */
   const fetchApi = async (
     url: string,
     property?: string
   ): Promise<any[] | null> => {
     try {
-      const response = await fetch(url, {
-        cache: 'no-store',
-      })
+      const response = await fetch(
+        url,
+        {
+          cache: 'no-store',
+        }
+      )
 
       if (!response.ok) {
         console.error(
           `${url} returned HTTP ${response.status}`
         )
+
         return null
       }
 
-      const json = await response.json()
+      const json =
+        await response.json()
 
-      // Some APIs return a direct array.
-      if (Array.isArray(json)) {
-        return json
-      }
-
-      // Other APIs return { students: [...] },
-      // { teachers: [...] }, etc.
-      return getApiArray(json, property)
+      return getApiArray(
+        json,
+        property
+      )
     } catch (error) {
-      console.error(`Failed to load ${url}:`, error)
+      console.error(
+        `Failed to load ${url}:`,
+        error
+      )
+
       return null
     }
   }
 
-  try {
-    /*
-     * Load students independently.
-     * Students are the most important dataset for
-     * the Students page.
-     */
-    const studentsArray = await fetchApi(
-      '/api/students',
-      'students'
-    )
-
-    /*
-     * Load the remaining datasets independently.
-     * A failure in one API must not prevent students
-     * from appearing.
-     */
-    const [
-      paymentsArray,
-      feesArray,
-      teachersArray,
-      classesArray,
-      subjectsArray,
-      examsArray,
-      marksArray,
-      attendanceArray,
-    ] = await Promise.all([
-      fetchApi('/api/payments', 'payments'),
-      fetchApi('/api/fees', 'fees'),
-      fetchApi('/api/teachers', 'teachers'),
-      fetchApi('/api/classes', 'classes'),
-      fetchApi('/api/subjects', 'subjects'),
-      fetchApi('/api/exams', 'exams'),
-      fetchApi('/api/marks', 'marks'),
-      fetchApi('/api/attendance', 'attendance'),
-    ])
-
-    /*
-     * Normalize classes.
-     */
-    const actualClasses =
-      classesArray !== null
-        ? classesArray.map((cls: any) => ({
-            ...cls,
-
-            id: String(cls.id),
-
-            name:
-              cls.name ??
-              cls.className ??
-              cls.class_name ??
-              '',
-
-            streams:
-              Array.isArray(cls.streams)
-                ? cls.streams
-                : cls.stream
-                  ? String(cls.stream)
-                      .split(',')
-                      .map((s: string) => s.trim())
-                      .filter(Boolean)
-                  : [],
-
-            classTeacherId:
-              cls.classTeacherId ??
-              (cls.class_teacher != null
-                ? String(cls.class_teacher)
-                : null),
-          }))
-        : null
-
-    /*
-     * Map students.
-     */
-    let mappedStudents: Student[] | null = null
-
-    if (studentsArray !== null) {
+  /*
+   * -----------------------------------------------------
+   * LOAD STUDENTS ONLY
+   * -----------------------------------------------------
+   *
+   * This is the important performance improvement.
+   *
+   * When a student is added/edited/deleted, we do NOT
+   * reload:
+   *
+   * teachers
+   * classes
+   * subjects
+   * exams
+   * marks
+   * attendance
+   * payments
+   * fees
+   *
+   * Only students are refreshed.
+   */
+  const loadStudentsOnly =
+    async (): Promise<void> => {
       try {
-        mappedStudents = studentsArray.map(mapStudent)
+        const studentsArray =
+          await fetchApi(
+            '/api/students',
+            'students'
+          )
+
+        if (studentsArray === null) {
+          console.error(
+            'Students API failed. Existing students were preserved.'
+          )
+
+          return
+        }
+
+        let mappedStudents:
+          StudentWithPhoto[]
+
+        try {
+          mappedStudents =
+            studentsArray.map(
+              mapStudent
+            )
+        } catch (error) {
+          console.error(
+            'Failed to map students:',
+            error
+          )
+
+          return
+        }
+
+        setData((current) => {
+          const students =
+            connectStudentsToClasses(
+              mappedStudents,
+              current.classes
+            )
+
+          return {
+            ...current,
+            students,
+          }
+        })
 
         console.log(
-          'STUDENTS API LOADED:',
+          'STUDENTS REFRESHED:',
           mappedStudents.length
         )
       } catch (error) {
         console.error(
-          'Failed to map students:',
+          'Failed to refresh students:',
           error
         )
-
-        mappedStudents = null
       }
     }
 
-    /*
-     * Map teachers.
-     */
-    let mappedTeachers: Teacher[] | null = null
-
-    if (teachersArray !== null) {
+  /*
+   * -----------------------------------------------------
+   * LOAD ALL SCHOOL DATA
+   * -----------------------------------------------------
+   *
+   * This is still used for initial loading and for the
+   * other school modules.
+   */
+  const loadData =
+    async (): Promise<void> => {
       try {
-        mappedTeachers = teachersArray.map(mapTeacher)
-      } catch (error) {
-        console.error(
-          'Failed to map teachers:',
-          error
-        )
-
-        mappedTeachers = null
-      }
-    }
-
-    /*
-     * Update the school state.
-     *
-     * IMPORTANT:
-     * If an API fails, keep the existing data instead
-     * of replacing it with an empty array.
-     */
-    setData((current) => {
-      const classesToUse =
-        actualClasses ?? current.classes
-
-      let actualStudents = current.students
-
-      if (mappedStudents !== null) {
-        try {
-          actualStudents =
-            classesToUse.length > 0
-              ? connectStudentsToClasses(
-                  mappedStudents,
-                  classesToUse
-                )
-              : mappedStudents
-        } catch (error) {
-          console.error(
-            'Failed to connect students to classes:',
-            error
+        /*
+         * Students are loaded independently so a failure
+         * in another API does not prevent students from
+         * appearing.
+         */
+        const studentsArray =
+          await fetchApi(
+            '/api/students',
+            'students'
           )
 
-          /*
-           * Even if class matching fails, NEVER
-           * throw away the students.
-           */
-          actualStudents = mappedStudents
+        /*
+         * Load the remaining datasets in parallel.
+         */
+        const [
+          paymentsArray,
+          feesArray,
+          teachersArray,
+          classesArray,
+          subjectsArray,
+          examsArray,
+          marksArray,
+          attendanceArray,
+        ] = await Promise.all([
+          fetchApi(
+            '/api/payments',
+            'payments'
+          ),
+
+          fetchApi(
+            '/api/fees',
+            'fees'
+          ),
+
+          fetchApi(
+            '/api/teachers',
+            'teachers'
+          ),
+
+          fetchApi(
+            '/api/classes',
+            'classes'
+          ),
+
+          fetchApi(
+            '/api/subjects',
+            'subjects'
+          ),
+
+          fetchApi(
+            '/api/exams',
+            'exams'
+          ),
+
+          fetchApi(
+            '/api/marks',
+            'marks'
+          ),
+
+          fetchApi(
+            '/api/attendance',
+            'attendance'
+          ),
+        ])
+
+        /*
+         * -------------------------------------------------
+         * NORMALIZE CLASSES
+         * -------------------------------------------------
+         */
+        const actualClasses =
+          classesArray !== null
+            ? classesArray.map(
+                (cls: any) => ({
+                  ...cls,
+
+                  id: String(
+                    cls.id
+                  ),
+
+                  name:
+                    cls.name ??
+                    cls.className ??
+                    cls.class_name ??
+                    '',
+
+                  streams:
+                    Array.isArray(
+                      cls.streams
+                    )
+                      ? cls.streams
+                      : cls.stream
+                        ? String(
+                            cls.stream
+                          )
+                            .split(',')
+                            .map(
+                              (
+                                s: string
+                              ) =>
+                                s.trim()
+                            )
+                            .filter(
+                              Boolean
+                            )
+                        : [],
+
+                  classTeacherId:
+                    cls.classTeacherId ??
+                    (
+                      cls.class_teacher !=
+                      null
+                    )
+                      ? String(
+                          cls.class_teacher
+                        )
+                      : null,
+                })
+              )
+            : null
+
+        /*
+         * -------------------------------------------------
+         * MAP STUDENTS
+         * -------------------------------------------------
+         */
+        let mappedStudents:
+          StudentWithPhoto[] | null =
+          null
+
+        if (
+          studentsArray !== null
+        ) {
+          try {
+            mappedStudents =
+              studentsArray.map(
+                mapStudent
+              )
+
+            console.log(
+              'STUDENTS API LOADED:',
+              mappedStudents.length
+            )
+          } catch (error) {
+            console.error(
+              'Failed to map students:',
+              error
+            )
+
+            mappedStudents = null
+          }
         }
-      }
 
-      const nextData: SchoolData = {
-        ...current,
+        /*
+         * -------------------------------------------------
+         * MAP TEACHERS
+         * -------------------------------------------------
+         */
+        let mappedTeachers:
+          Teacher[] | null =
+          null
 
-        students: actualStudents,
+        if (
+          teachersArray !== null
+        ) {
+          try {
+            mappedTeachers =
+              teachersArray.map(
+                mapTeacher
+              )
+          } catch (error) {
+            console.error(
+              'Failed to map teachers:',
+              error
+            )
 
-        teachers:
-          mappedTeachers !== null
-            ? mappedTeachers
-            : current.teachers,
-
-        classes:
-          actualClasses !== null
-            ? actualClasses
-            : current.classes,
-
-        subjects:
-          subjectsArray !== null
-            ? subjectsArray
-            : current.subjects,
-
-        exams:
-          examsArray !== null
-            ? examsArray
-            : current.exams,
-
-        marks:
-          marksArray !== null
-            ? marksArray
-            : current.marks,
-
-        attendance:
-          attendanceArray !== null
-            ? attendanceArray
-            : current.attendance,
-
-        payments:
-          paymentsArray !== null
-            ? paymentsArray
-            : current.payments,
-
-        fees:
-          feesArray !== null
-            ? feesArray
-            : current.fees,
-      }
-
-      console.log(
-        'FINAL SCHOOL STATE:',
-        {
-          students: nextData.students.length,
-          teachers: nextData.teachers.length,
-          classes: nextData.classes.length,
-          subjects: nextData.subjects.length,
-          payments: nextData.payments.length,
-          fees: nextData.fees.length,
+            mappedTeachers = null
+          }
         }
-      )
 
-      return nextData
-    })
+        /*
+         * -------------------------------------------------
+         * UPDATE SCHOOL STATE
+         * -------------------------------------------------
+         *
+         * Failed APIs do not erase existing data.
+         */
+        setData((current) => {
+          const classesToUse =
+            actualClasses ??
+            current.classes
 
-    console.log(
-      'DATABASE DATA LOADED:',
-      {
-        students:
-          studentsArray?.length ?? 'FAILED',
+          let actualStudents =
+            current.students
 
-        teachers:
-          teachersArray?.length ?? 'FAILED',
+          if (
+            mappedStudents !== null
+          ) {
+            try {
+              actualStudents =
+                classesToUse.length >
+                0
+                  ? connectStudentsToClasses(
+                      mappedStudents,
+                      classesToUse
+                    )
+                  : mappedStudents
+            } catch (error) {
+              console.error(
+                'Failed to connect students to classes:',
+                error
+              )
 
-        classes:
-          classesArray?.length ?? 'FAILED',
+              actualStudents =
+                mappedStudents
+            }
+          }
 
-        subjects:
-          subjectsArray?.length ?? 'FAILED',
+          const nextData:
+            SchoolData = {
+            ...current,
 
-        exams:
-          examsArray?.length ?? 'FAILED',
+            students:
+              actualStudents,
 
-        marks:
-          marksArray?.length ?? 'FAILED',
+            teachers:
+              mappedTeachers !== null
+                ? mappedTeachers
+                : current.teachers,
 
-        attendance:
-          attendanceArray?.length ?? 'FAILED',
+            classes:
+              actualClasses !== null
+                ? actualClasses
+                : current.classes,
 
-        payments:
-          paymentsArray?.length ?? 'FAILED',
+            subjects:
+              subjectsArray !== null
+                ? subjectsArray
+                : current.subjects,
 
-        fees:
-          feesArray?.length ?? 'FAILED',
+            exams:
+              examsArray !== null
+                ? examsArray
+                : current.exams,
+
+            marks:
+              marksArray !== null
+                ? marksArray
+                : current.marks,
+
+            attendance:
+              attendanceArray !== null
+                ? attendanceArray
+                : current.attendance,
+
+            payments:
+              paymentsArray !== null
+                ? paymentsArray
+                : current.payments,
+
+            fees:
+              feesArray !== null
+                ? feesArray
+                : current.fees,
+          }
+
+          console.log(
+            'FINAL SCHOOL STATE:',
+            {
+              students:
+                nextData.students
+                  .length,
+
+              teachers:
+                nextData.teachers
+                  .length,
+
+              classes:
+                nextData.classes
+                  .length,
+
+              subjects:
+                nextData.subjects
+                  .length,
+
+              payments:
+                nextData.payments
+                  .length,
+
+              fees:
+                nextData.fees
+                  .length,
+            }
+          )
+
+          return nextData
+        })
+
+        console.log(
+          'DATABASE DATA LOADED:',
+          {
+            students:
+              studentsArray?.length ??
+              'FAILED',
+
+            teachers:
+              teachersArray?.length ??
+              'FAILED',
+
+            classes:
+              classesArray?.length ??
+              'FAILED',
+
+            subjects:
+              subjectsArray?.length ??
+              'FAILED',
+
+            exams:
+              examsArray?.length ??
+              'FAILED',
+
+            marks:
+              marksArray?.length ??
+              'FAILED',
+
+            attendance:
+              attendanceArray?.length ??
+              'FAILED',
+
+            payments:
+              paymentsArray?.length ??
+              'FAILED',
+
+            fees:
+              feesArray?.length ??
+              'FAILED',
+          }
+        )
+      } catch (error) {
+        console.error(
+          'Failed to load school data:',
+          error
+        )
       }
-    )
-  } catch (error) {
-    console.error(
-      'Failed to load school data:',
-      error
-    )
-  }
-}
+    }
+
+  /*
+   * -----------------------------------------------------
+   * INITIAL LOAD + LOGIN RESTORATION
+   * -----------------------------------------------------
+   */
   useEffect(() => {
+    console.log(
+      '🏫 SCHOOL PROVIDER MOUNTED'
+    )
+
     loadData()
 
     try {
@@ -744,8 +960,19 @@ export function SchoolProvider({
         error
       )
     }
+
+    return () => {
+      console.log(
+        '🏫 SCHOOL PROVIDER UNMOUNTED'
+      )
+    }
   }, [])
 
+  /*
+   * -----------------------------------------------------
+   * LOGIN
+   * -----------------------------------------------------
+   */
   const login = (
     user: LoginData
   ) => {
@@ -756,24 +983,24 @@ export function SchoolProvider({
 
     const loggedInUser:
       CurrentUser = {
-        id:
-          user.id,
+      id:
+        user.id,
 
-        username:
-          user.username,
+      username:
+        user.username,
 
-        name:
-          user.name,
+      name:
+        user.name,
 
-        email:
-          user.email,
+      email:
+        user.email,
 
-        role:
-          normalizedRole,
+      role:
+        normalizedRole,
 
-        studentId:
-          user.studentId,
-      }
+      studentId:
+        user.studentId,
+    }
 
     setRole(
       normalizedRole
@@ -800,6 +1027,11 @@ export function SchoolProvider({
     }
   }
 
+  /*
+   * -----------------------------------------------------
+   * LOGOUT
+   * -----------------------------------------------------
+   */
   const logout = () => {
     setLoggedIn(false)
 
@@ -819,6 +1051,14 @@ export function SchoolProvider({
     }
   }
 
+  /*
+   * -----------------------------------------------------
+   * STUDENT CRUD
+   * -----------------------------------------------------
+   *
+   * IMPORTANT:
+   * Student operations refresh ONLY students.
+   */
   const addStudent = async (
     student: Student
   ) => {
@@ -841,11 +1081,20 @@ export function SchoolProvider({
       )
 
     if (!response.ok) {
+      const error =
+        await response
+          .json()
+          .catch(
+            () => null
+          )
+
       throw new Error(
-        'Failed to create student'
+        error?.error ||
+          'Failed to create student'
       )
     }
-await loadStudentsOnly()
+
+    await loadStudentsOnly()
   }
 
   const updateStudent =
@@ -873,8 +1122,16 @@ await loadStudentsOnly()
         )
 
       if (!response.ok) {
+        const error =
+          await response
+            .json()
+            .catch(
+              () => null
+            )
+
         throw new Error(
-          'Failed to update student'
+          error?.error ||
+            'Failed to update student'
         )
       }
 
@@ -896,14 +1153,27 @@ await loadStudentsOnly()
         )
 
       if (!response.ok) {
+        const error =
+          await response
+            .json()
+            .catch(
+              () => null
+            )
+
         throw new Error(
-          'Failed to delete student'
+          error?.error ||
+            'Failed to delete student'
         )
       }
 
-     await loadStudentsOnly()
+      await loadStudentsOnly()
     }
 
+  /*
+   * -----------------------------------------------------
+   * TEACHER CRUD
+   * -----------------------------------------------------
+   */
   const addTeacher = async (
     teacher: Teacher
   ) => {
@@ -999,6 +1269,11 @@ await loadStudentsOnly()
       await loadData()
     }
 
+  /*
+   * -----------------------------------------------------
+   * CLASS CRUD
+   * -----------------------------------------------------
+   */
   const addClass = async (
     item: any
   ) => {
@@ -1085,6 +1360,11 @@ await loadStudentsOnly()
       await loadData()
     }
 
+  /*
+   * -----------------------------------------------------
+   * SUBJECT CRUD
+   * -----------------------------------------------------
+   */
   const addSubject =
     async (
       item: Subject
@@ -1172,6 +1452,11 @@ await loadStudentsOnly()
       await loadData()
     }
 
+  /*
+   * -----------------------------------------------------
+   * EXAM CRUD
+   * -----------------------------------------------------
+   */
   const addExam = async (
     item: Exam
   ) => {
@@ -1258,6 +1543,11 @@ await loadStudentsOnly()
       await loadData()
     }
 
+  /*
+   * -----------------------------------------------------
+   * PAYMENT
+   * -----------------------------------------------------
+   */
   const addPayment =
     async (
       item: Payment
@@ -1289,6 +1579,11 @@ await loadStudentsOnly()
       await loadData()
     }
 
+  /*
+   * -----------------------------------------------------
+   * SCHOOL INFORMATION
+   * -----------------------------------------------------
+   */
   const updateSchoolInfo =
     (
       info: SchoolInfo
@@ -1303,6 +1598,11 @@ await loadStudentsOnly()
       )
     }
 
+  /*
+   * -----------------------------------------------------
+   * ATTENDANCE
+   * -----------------------------------------------------
+   */
   const saveAttendance =
     async (
       studentId: string,
@@ -1338,6 +1638,11 @@ await loadStudentsOnly()
       await loadData()
     }
 
+  /*
+   * -----------------------------------------------------
+   * CONTEXT VALUE
+   * -----------------------------------------------------
+   */
   const value =
     useMemo<SchoolContextValue>(
       () => ({
@@ -1394,6 +1699,11 @@ await loadStudentsOnly()
   )
 }
 
+/*
+ * -------------------------------------------------------
+ * USE SCHOOL
+ * -------------------------------------------------------
+ */
 export function useSchool() {
   const context =
     useContext(
