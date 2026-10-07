@@ -320,6 +320,47 @@ export function SchoolProvider({
 }: {
   children: ReactNode
 }) {
+  const loadStudentsOnly = async () => {
+  try {
+    const response = await fetch(
+      "/api/students",
+      {
+        cache: "no-store",
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(
+        "Failed to fetch students"
+      )
+    }
+
+    const json = await response.json()
+
+    const studentsArray = Array.isArray(json)
+      ? json
+      : Array.isArray(json?.students)
+        ? json.students
+        : Array.isArray(json?.data)
+          ? json.data
+          : []
+
+    const mappedStudents =
+      studentsArray.map(mapStudent)
+
+    setStudents(
+      connectStudentsToClasses(
+        mappedStudents,
+        classes
+      )
+    )
+  } catch (error) {
+    console.error(
+      "Failed to refresh students:",
+      error
+    )
+  }
+}
   /*
    * IMPORTANT:
    * No demo/sample data is generated here.
