@@ -1,3 +1,5 @@
+'use client'
+
 import {
   createContext,
   useContext,
@@ -29,10 +31,19 @@ export type CurrentUser = {
   studentId?: string
 }
 
-type StudentWithPhoto = Student & {
+/*
+ * Student data used by the database/API.
+ *
+ * Your original Student type in lib/data.ts does not contain
+ * these database-specific fields, so we extend it here.
+ */
+export type StudentWithPhoto = Student & {
+  middleName?: string
+  address?: string
+  className?: string
+  createdAt?: string
   photoUrl?: string
   hasPhoto?: boolean
-  email?: string
 }
 
 type LoginData = {
@@ -81,7 +92,7 @@ type SchoolContextValue = {
   saveAttendance: (
     studentId: string,
     date: string,
-    status: AttendanceStatus
+    status: AttendanceStatus,
   ) => Promise<void>
 }
 
@@ -92,14 +103,6 @@ const SchoolContext =
  * -------------------------------------------------------
  * STUDENT MAPPER
  * -------------------------------------------------------
- *
- * Converts the API/database format into the format used
- * throughout the application.
- *
- * IMPORTANT:
- * hasPhoto is only a boolean.
- * The actual Base64 photo is NOT loaded with the student
- * list.
  */
 function mapStudent(student: any): StudentWithPhoto {
   return {
@@ -115,11 +118,6 @@ function mapStudent(student: any): StudentWithPhoto {
       student.first_name ??
       '',
 
-    middleName:
-      student.middleName ??
-      student.middle_name ??
-      '',
-
     lastName:
       student.lastName ??
       student.last_name ??
@@ -129,18 +127,8 @@ function mapStudent(student: any): StudentWithPhoto {
       student.gender ??
       'Male',
 
-    dateOfBirth:
-      student.dateOfBirth ??
-      student.date_of_birth ??
-      '',
-
     classId:
       student.classId ??
-      student.className ??
-      student.class_name ??
-      '',
-
-    className:
       student.className ??
       student.class_name ??
       '',
@@ -148,6 +136,11 @@ function mapStudent(student: any): StudentWithPhoto {
     stream:
       student.stream ??
       'Main',
+
+    dateOfBirth:
+      student.dateOfBirth ??
+      student.date_of_birth ??
+      '',
 
     guardianName:
       student.guardianName ??
@@ -161,13 +154,6 @@ function mapStudent(student: any): StudentWithPhoto {
       student.parent_phone ??
       '',
 
-    address:
-      student.address ??
-      '',
-
-    /*
-     * Student email was previously missing here.
-     */
     email:
       student.email ??
       '',
@@ -181,14 +167,31 @@ function mapStudent(student: any): StudentWithPhoto {
       student.status ??
       'Active',
 
+    /*
+     * Extended database fields.
+     */
+    middleName:
+      student.middleName ??
+      student.middle_name ??
+      '',
+
+    address:
+      student.address ??
+      '',
+
+    className:
+      student.className ??
+      student.class_name ??
+      '',
+
     createdAt:
       student.createdAt ??
       student.created_at ??
       '',
 
     /*
-     * The lightweight /api/students endpoint normally
-     * does not return the actual photo.
+     * The normal student list should only return a photo
+     * when specifically supplied. Usually this remains empty.
      */
     photoUrl:
       student.photoUrl ??
@@ -196,7 +199,10 @@ function mapStudent(student: any): StudentWithPhoto {
       '',
 
     hasPhoto:
-      Boolean(student.hasPhoto),
+      Boolean(
+        student.hasPhoto ??
+        student.has_photo
+      ),
   }
 }
 
@@ -237,17 +243,14 @@ function mapTeacher(teacher: any): Teacher {
       '',
 
     subjectIds:
-      teacher.subjectIds ??
-      (
-        teacher.subject
+      Array.isArray(teacher.subjectIds)
+        ? teacher.subjectIds
+        : teacher.subject
           ? String(teacher.subject)
               .split(',')
-              .map(
-                (s: string) => s.trim()
-              )
+              .map((s: string) => s.trim())
               .filter(Boolean)
-          : []
-      ),
+          : [],
 
     employmentDate:
       teacher.employmentDate ??
@@ -267,11 +270,9 @@ function mapTeacher(teacher: any): Teacher {
  */
 function connectStudentsToClasses(
   students: StudentWithPhoto[],
-  classes: any[]
+  classes: any[],
 ): StudentWithPhoto[] {
-  const normalizeClassName = (
-    value: string
-  ) =>
+  const normalizeClassName = (value: string) =>
     value
       .trim()
       .toLowerCase()
@@ -281,7 +282,7 @@ function connectStudentsToClasses(
     const className = String(
       student.className ||
         student.classId ||
-        ''
+        '',
     ).trim()
 
     if (!className) {
@@ -294,7 +295,7 @@ function connectStudentsToClasses(
           cls.name ??
             cls.className ??
             cls.class_name ??
-            ''
+            '',
         ).trim()
 
         return (
@@ -303,10 +304,6 @@ function connectStudentsToClasses(
         )
       })
 
-    /*
-     * If the class does not yet exist in the classes
-     * table, preserve the student's class name.
-     */
     if (!matchingClass) {
       return {
         ...student,
@@ -319,7 +316,7 @@ function connectStudentsToClasses(
       matchingClass.name ??
         matchingClass.className ??
         matchingClass.class_name ??
-        className
+        className,
     ).trim()
 
     return {
@@ -337,7 +334,7 @@ function connectStudentsToClasses(
  */
 function getApiArray(
   json: any,
-  property?: string
+  property?: string,
 ): any[] {
   if (Array.isArray(json)) {
     return json
@@ -367,45 +364,55 @@ export function SchoolProvider({
 }: {
   children: ReactNode
 }) {
+  /*
+   * IMPORTANT:
+   *
+   * This structure MUST match SchoolData in lib/data.ts.
+   */
   const [data, setData] =
     useState<SchoolData>({
       school: {
         name:
           'Kanyunga Comprehensive School',
 
-        motto: '',
+        motto:
+          'Education for Excellence',
 
-        address: '',
+        poBox:
+          '',
 
-        phone: '',
+        phone:
+          '',
 
-        email: '',
+        email:
+          '',
 
-        logo: '',
+        currentTerm:
+          '',
 
-        currentTerm: '',
-
-        year:
+        currentYear:
           new Date().getFullYear(),
       },
-
-      students: [],
-
-      teachers: [],
 
       classes: [],
 
       subjects: [],
 
+      students: [],
+
+      teachers: [],
+
+      studentAttendance: [],
+
+      teacherAttendance: [],
+
       exams: [],
 
       marks: [],
 
-      attendance: [],
+      feeStructures: [],
 
       payments: [],
-
-      fees: [],
     })
 
   const [role, setRole] =
@@ -414,9 +421,6 @@ export function SchoolProvider({
   const [currentUser, setCurrentUser] =
     useState<CurrentUser | null>(null)
 
-  const [loggedIn, setLoggedIn] =
-    useState(false)
-
   /*
    * -----------------------------------------------------
    * GENERIC API FETCHER
@@ -424,19 +428,17 @@ export function SchoolProvider({
    */
   const fetchApi = async (
     url: string,
-    property?: string
+    property?: string,
   ): Promise<any[] | null> => {
     try {
-      const response = await fetch(
-        url,
-        {
+      const response =
+        await fetch(url, {
           cache: 'no-store',
-        }
-      )
+        })
 
       if (!response.ok) {
         console.error(
-          `${url} returned HTTP ${response.status}`
+          `${url} returned HTTP ${response.status}`,
         )
 
         return null
@@ -447,12 +449,12 @@ export function SchoolProvider({
 
       return getApiArray(
         json,
-        property
+        property,
       )
     } catch (error) {
       console.error(
         `Failed to load ${url}:`,
-        error
+        error,
       )
 
       return null
@@ -464,21 +466,8 @@ export function SchoolProvider({
    * LOAD STUDENTS ONLY
    * -----------------------------------------------------
    *
-   * This is the important performance improvement.
-   *
-   * When a student is added/edited/deleted, we do NOT
-   * reload:
-   *
-   * teachers
-   * classes
-   * subjects
-   * exams
-   * marks
-   * attendance
-   * payments
-   * fees
-   *
-   * Only students are refreshed.
+   * Student add/edit/delete uses this instead of
+   * reloading the entire school database.
    */
   const loadStudentsOnly =
     async (): Promise<void> => {
@@ -486,55 +475,42 @@ export function SchoolProvider({
         const studentsArray =
           await fetchApi(
             '/api/students',
-            'students'
+            'students',
           )
 
-        if (studentsArray === null) {
+        if (
+          studentsArray === null
+        ) {
           console.error(
-            'Students API failed. Existing students were preserved.'
+            'Students API failed. Existing students were preserved.',
           )
 
           return
         }
 
-        let mappedStudents:
-          StudentWithPhoto[]
-
-        try {
-          mappedStudents =
-            studentsArray.map(
-              mapStudent
-            )
-        } catch (error) {
-          console.error(
-            'Failed to map students:',
-            error
+        const mappedStudents =
+          studentsArray.map(
+            mapStudent,
           )
 
-          return
-        }
+        setData((current) => ({
+          ...current,
 
-        setData((current) => {
-          const students =
+          students:
             connectStudentsToClasses(
               mappedStudents,
-              current.classes
-            )
-
-          return {
-            ...current,
-            students,
-          }
-        })
+              current.classes,
+            ),
+        }))
 
         console.log(
           'STUDENTS REFRESHED:',
-          mappedStudents.length
+          mappedStudents.length,
         )
       } catch (error) {
         console.error(
           'Failed to refresh students:',
-          error
+          error,
         )
       }
     }
@@ -543,28 +519,12 @@ export function SchoolProvider({
    * -----------------------------------------------------
    * LOAD ALL SCHOOL DATA
    * -----------------------------------------------------
-   *
-   * This is still used for initial loading and for the
-   * other school modules.
    */
   const loadData =
     async (): Promise<void> => {
       try {
-        /*
-         * Students are loaded independently so a failure
-         * in another API does not prevent students from
-         * appearing.
-         */
-        const studentsArray =
-          await fetchApi(
-            '/api/students',
-            'students'
-          )
-
-        /*
-         * Load the remaining datasets in parallel.
-         */
         const [
+          studentsArray,
           paymentsArray,
           feesArray,
           teachersArray,
@@ -575,49 +535,54 @@ export function SchoolProvider({
           attendanceArray,
         ] = await Promise.all([
           fetchApi(
+            '/api/students',
+            'students',
+          ),
+
+          fetchApi(
             '/api/payments',
-            'payments'
+            'payments',
           ),
 
           fetchApi(
             '/api/fees',
-            'fees'
+            'fees',
           ),
 
           fetchApi(
             '/api/teachers',
-            'teachers'
+            'teachers',
           ),
 
           fetchApi(
             '/api/classes',
-            'classes'
+            'classes',
           ),
 
           fetchApi(
             '/api/subjects',
-            'subjects'
+            'subjects',
           ),
 
           fetchApi(
             '/api/exams',
-            'exams'
+            'exams',
           ),
 
           fetchApi(
             '/api/marks',
-            'marks'
+            'marks',
           ),
 
           fetchApi(
             '/api/attendance',
-            'attendance'
+            'attendance',
           ),
         ])
 
         /*
          * -------------------------------------------------
-         * NORMALIZE CLASSES
+         * CLASSES
          * -------------------------------------------------
          */
         const actualClasses =
@@ -627,7 +592,7 @@ export function SchoolProvider({
                   ...cls,
 
                   id: String(
-                    cls.id
+                    cls.id,
                   ),
 
                   name:
@@ -638,22 +603,22 @@ export function SchoolProvider({
 
                   streams:
                     Array.isArray(
-                      cls.streams
+                      cls.streams,
                     )
                       ? cls.streams
                       : cls.stream
                         ? String(
-                            cls.stream
+                            cls.stream,
                           )
                             .split(',')
                             .map(
                               (
-                                s: string
+                                s: string,
                               ) =>
-                                s.trim()
+                                s.trim(),
                             )
                             .filter(
-                              Boolean
+                              Boolean,
                             )
                         : [],
 
@@ -662,18 +627,18 @@ export function SchoolProvider({
                     (
                       cls.class_teacher !=
                       null
-                    )
-                      ? String(
-                          cls.class_teacher
-                        )
-                      : null,
-                })
+                        ? String(
+                            cls.class_teacher,
+                          )
+                        : null
+                    ),
+                }),
               )
             : null
 
         /*
          * -------------------------------------------------
-         * MAP STUDENTS
+         * STUDENTS
          * -------------------------------------------------
          */
         let mappedStudents:
@@ -686,26 +651,24 @@ export function SchoolProvider({
           try {
             mappedStudents =
               studentsArray.map(
-                mapStudent
+                mapStudent,
               )
 
             console.log(
               'STUDENTS API LOADED:',
-              mappedStudents.length
+              mappedStudents.length,
             )
           } catch (error) {
             console.error(
               'Failed to map students:',
-              error
+              error,
             )
-
-            mappedStudents = null
           }
         }
 
         /*
          * -------------------------------------------------
-         * MAP TEACHERS
+         * TEACHERS
          * -------------------------------------------------
          */
         let mappedTeachers:
@@ -718,24 +681,20 @@ export function SchoolProvider({
           try {
             mappedTeachers =
               teachersArray.map(
-                mapTeacher
+                mapTeacher,
               )
           } catch (error) {
             console.error(
               'Failed to map teachers:',
-              error
+              error,
             )
-
-            mappedTeachers = null
           }
         }
 
         /*
          * -------------------------------------------------
-         * UPDATE SCHOOL STATE
+         * UPDATE STATE
          * -------------------------------------------------
-         *
-         * Failed APIs do not erase existing data.
          */
         setData((current) => {
           const classesToUse =
@@ -748,104 +707,70 @@ export function SchoolProvider({
           if (
             mappedStudents !== null
           ) {
-            try {
-              actualStudents =
-                classesToUse.length >
-                0
-                  ? connectStudentsToClasses(
-                      mappedStudents,
-                      classesToUse
-                    )
-                  : mappedStudents
-            } catch (error) {
-              console.error(
-                'Failed to connect students to classes:',
-                error
+            actualStudents =
+              connectStudentsToClasses(
+                mappedStudents,
+                classesToUse,
               )
-
-              actualStudents =
-                mappedStudents
-            }
           }
 
-          const nextData:
-            SchoolData = {
+          /*
+           * Attendance API normally returns student
+           * attendance records. We keep them in the
+           * correct SchoolData property.
+           */
+          const studentAttendance =
+            attendanceArray !== null
+              ? attendanceArray.filter(
+                  (item: any) =>
+                    item.studentId != null ||
+                    item.student_id != null,
+                )
+              : current.studentAttendance
+
+          return {
             ...current,
 
             students:
               actualStudents,
 
             teachers:
-              mappedTeachers !== null
-                ? mappedTeachers
-                : current.teachers,
+              mappedTeachers ??
+              current.teachers,
 
             classes:
-              actualClasses !== null
-                ? actualClasses
-                : current.classes,
+              actualClasses ??
+              current.classes,
 
             subjects:
-              subjectsArray !== null
-                ? subjectsArray
-                : current.subjects,
+              subjectsArray ??
+              current.subjects,
 
             exams:
-              examsArray !== null
-                ? examsArray
-                : current.exams,
+              examsArray ??
+              current.exams,
 
             marks:
-              marksArray !== null
-                ? marksArray
-                : current.marks,
+              marksArray ??
+              current.marks,
 
-            attendance:
-              attendanceArray !== null
-                ? attendanceArray
-                : current.attendance,
+            studentAttendance,
+
+            /*
+             * Preserve teacher attendance unless your
+             * attendance API specifically supplies it.
+             */
+            teacherAttendance:
+              current.teacherAttendance,
 
             payments:
-              paymentsArray !== null
-                ? paymentsArray
-                : current.payments,
+              paymentsArray ??
+              current.payments,
 
-            fees:
-              feesArray !== null
-                ? feesArray
-                : current.fees,
+            feeStructures:
+              feesArray ??
+              current.feeStructures,
           }
-
-          console.log(
-            'FINAL SCHOOL STATE:',
-            {
-              students:
-                nextData.students
-                  .length,
-
-              teachers:
-                nextData.teachers
-                  .length,
-
-              classes:
-                nextData.classes
-                  .length,
-
-              subjects:
-                nextData.subjects
-                  .length,
-
-              payments:
-                nextData.payments
-                  .length,
-
-              fees:
-                nextData.fees
-                  .length,
-            }
-          )
-
-          return nextData
         })
 
         console.log(
@@ -886,12 +811,12 @@ export function SchoolProvider({
             fees:
               feesArray?.length ??
               'FAILED',
-          }
+          },
         )
       } catch (error) {
         console.error(
           'Failed to load school data:',
-          error
+          error,
         )
       }
     }
@@ -903,15 +828,15 @@ export function SchoolProvider({
    */
   useEffect(() => {
     console.log(
-      '🏫 SCHOOL PROVIDER MOUNTED'
+      '🏫 SCHOOL PROVIDER MOUNTED',
     )
 
-    loadData()
+    void loadData()
 
     try {
       const savedUser =
         localStorage.getItem(
-          'kanyunga-user'
+          'kanyunga-user',
         )
 
       if (!savedUser) {
@@ -924,15 +849,16 @@ export function SchoolProvider({
       if (user?.role) {
         const normalizedRole =
           String(
-            user.role
+            user.role,
           ).toLowerCase() as Role
 
         setRole(
-          normalizedRole
+          normalizedRole,
         )
 
         setCurrentUser({
-          id: user.id,
+          id:
+            user.id,
 
           username:
             user.username,
@@ -951,19 +877,17 @@ export function SchoolProvider({
           studentId:
             user.studentId,
         })
-
-        setLoggedIn(true)
       }
     } catch (error) {
       console.error(
         'Failed to restore login session:',
-        error
+        error,
       )
     }
 
     return () => {
       console.log(
-        '🏫 SCHOOL PROVIDER UNMOUNTED'
+        '🏫 SCHOOL PROVIDER UNMOUNTED',
       )
     }
   }, [])
@@ -974,11 +898,11 @@ export function SchoolProvider({
    * -----------------------------------------------------
    */
   const login = (
-    user: LoginData
+    user: LoginData,
   ) => {
     const normalizedRole =
       String(
-        user.role
+        user.role,
       ).toLowerCase() as Role
 
     const loggedInUser:
@@ -1003,26 +927,24 @@ export function SchoolProvider({
     }
 
     setRole(
-      normalizedRole
+      normalizedRole,
     )
 
     setCurrentUser(
-      loggedInUser
+      loggedInUser,
     )
-
-    setLoggedIn(true)
 
     try {
       localStorage.setItem(
         'kanyunga-user',
         JSON.stringify(
-          loggedInUser
-        )
+          loggedInUser,
+        ),
       )
     } catch (error) {
       console.error(
         'Failed to save login session:',
-        error
+        error,
       )
     }
   }
@@ -1033,20 +955,18 @@ export function SchoolProvider({
    * -----------------------------------------------------
    */
   const logout = () => {
-    setLoggedIn(false)
-
     setRole('admin')
 
     setCurrentUser(null)
 
     try {
       localStorage.removeItem(
-        'kanyunga-user'
+        'kanyunga-user',
       )
     } catch (error) {
       console.error(
         'Failed to clear login session:',
-        error
+        error,
       )
     }
   }
@@ -1055,12 +975,9 @@ export function SchoolProvider({
    * -----------------------------------------------------
    * STUDENT CRUD
    * -----------------------------------------------------
-   *
-   * IMPORTANT:
-   * Student operations refresh ONLY students.
    */
   const addStudent = async (
-    student: Student
+    student: Student,
   ) => {
     const response =
       await fetch(
@@ -1075,9 +992,9 @@ export function SchoolProvider({
 
           body:
             JSON.stringify(
-              student
+              student,
             ),
-        }
+        },
       )
 
     if (!response.ok) {
@@ -1085,12 +1002,12 @@ export function SchoolProvider({
         await response
           .json()
           .catch(
-            () => null
+            () => null,
           )
 
       throw new Error(
         error?.error ||
-          'Failed to create student'
+          'Failed to create student',
       )
     }
 
@@ -1099,12 +1016,12 @@ export function SchoolProvider({
 
   const updateStudent =
     async (
-      student: Student
+      student: Student,
     ) => {
       const response =
         await fetch(
           `/api/students/${encodeURIComponent(
-            student.id
+            student.id,
           )}`,
           {
             method: 'PUT',
@@ -1116,9 +1033,9 @@ export function SchoolProvider({
 
             body:
               JSON.stringify(
-                student
+                student,
               ),
-          }
+          },
         )
 
       if (!response.ok) {
@@ -1126,12 +1043,12 @@ export function SchoolProvider({
           await response
             .json()
             .catch(
-              () => null
+              () => null,
             )
 
         throw new Error(
           error?.error ||
-            'Failed to update student'
+            'Failed to update student',
         )
       }
 
@@ -1140,16 +1057,16 @@ export function SchoolProvider({
 
   const deleteStudent =
     async (
-      id: string
+      id: string,
     ) => {
       const response =
         await fetch(
           `/api/students/${encodeURIComponent(
-            id
+            id,
           )}`,
           {
             method: 'DELETE',
-          }
+          },
         )
 
       if (!response.ok) {
@@ -1157,12 +1074,12 @@ export function SchoolProvider({
           await response
             .json()
             .catch(
-              () => null
+              () => null,
             )
 
         throw new Error(
           error?.error ||
-            'Failed to delete student'
+            'Failed to delete student',
         )
       }
 
@@ -1175,7 +1092,7 @@ export function SchoolProvider({
    * -----------------------------------------------------
    */
   const addTeacher = async (
-    teacher: Teacher
+    teacher: Teacher,
   ) => {
     const response =
       await fetch(
@@ -1190,9 +1107,9 @@ export function SchoolProvider({
 
           body:
             JSON.stringify(
-              teacher
+              teacher,
             ),
-        }
+        },
       )
 
     if (!response.ok) {
@@ -1200,13 +1117,13 @@ export function SchoolProvider({
         await response
           .json()
           .catch(
-            () => null
+            () => null,
           )
 
       throw new Error(
         error?.error ||
           error?.detail ||
-          'Failed to create teacher'
+          'Failed to create teacher',
       )
     }
 
@@ -1215,12 +1132,12 @@ export function SchoolProvider({
 
   const updateTeacher =
     async (
-      teacher: Teacher
+      teacher: Teacher,
     ) => {
       const response =
         await fetch(
           `/api/teachers/${encodeURIComponent(
-            teacher.id
+            teacher.id,
           )}`,
           {
             method: 'PUT',
@@ -1232,14 +1149,14 @@ export function SchoolProvider({
 
             body:
               JSON.stringify(
-                teacher
+                teacher,
               ),
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to update teacher'
+          'Failed to update teacher',
         )
       }
 
@@ -1248,21 +1165,21 @@ export function SchoolProvider({
 
   const deleteTeacher =
     async (
-      id: string
+      id: string,
     ) => {
       const response =
         await fetch(
           `/api/teachers/${encodeURIComponent(
-            id
+            id,
           )}`,
           {
             method: 'DELETE',
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to delete teacher'
+          'Failed to delete teacher',
         )
       }
 
@@ -1275,7 +1192,7 @@ export function SchoolProvider({
    * -----------------------------------------------------
    */
   const addClass = async (
-    item: any
+    item: any,
   ) => {
     const response =
       await fetch(
@@ -1290,14 +1207,14 @@ export function SchoolProvider({
 
           body:
             JSON.stringify(
-              item
+              item,
             ),
-        }
+        },
       )
 
     if (!response.ok) {
       throw new Error(
-        'Failed to create class'
+        'Failed to create class',
       )
     }
 
@@ -1306,12 +1223,12 @@ export function SchoolProvider({
 
   const updateClass =
     async (
-      item: any
+      item: any,
     ) => {
       const response =
         await fetch(
           `/api/classes/${encodeURIComponent(
-            item.id
+            item.id,
           )}`,
           {
             method: 'PUT',
@@ -1323,14 +1240,14 @@ export function SchoolProvider({
 
             body:
               JSON.stringify(
-                item
+                item,
               ),
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to update class'
+          'Failed to update class',
         )
       }
 
@@ -1339,21 +1256,21 @@ export function SchoolProvider({
 
   const deleteClass =
     async (
-      id: string
+      id: string,
     ) => {
       const response =
         await fetch(
           `/api/classes/${encodeURIComponent(
-            id
+            id,
           )}`,
           {
             method: 'DELETE',
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to delete class'
+          'Failed to delete class',
         )
       }
 
@@ -1367,7 +1284,7 @@ export function SchoolProvider({
    */
   const addSubject =
     async (
-      item: Subject
+      item: Subject,
     ) => {
       const response =
         await fetch(
@@ -1382,14 +1299,14 @@ export function SchoolProvider({
 
             body:
               JSON.stringify(
-                item
+                item,
               ),
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to create subject'
+          'Failed to create subject',
         )
       }
 
@@ -1398,12 +1315,12 @@ export function SchoolProvider({
 
   const updateSubject =
     async (
-      item: Subject
+      item: Subject,
     ) => {
       const response =
         await fetch(
           `/api/subjects/${encodeURIComponent(
-            item.id
+            item.id,
           )}`,
           {
             method: 'PUT',
@@ -1415,14 +1332,14 @@ export function SchoolProvider({
 
             body:
               JSON.stringify(
-                item
+                item,
               ),
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to update subject'
+          'Failed to update subject',
         )
       }
 
@@ -1431,21 +1348,21 @@ export function SchoolProvider({
 
   const deleteSubject =
     async (
-      id: string
+      id: string,
     ) => {
       const response =
         await fetch(
           `/api/subjects/${encodeURIComponent(
-            id
+            id,
           )}`,
           {
             method: 'DELETE',
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to delete subject'
+          'Failed to delete subject',
         )
       }
 
@@ -1458,7 +1375,7 @@ export function SchoolProvider({
    * -----------------------------------------------------
    */
   const addExam = async (
-    item: Exam
+    item: Exam,
   ) => {
     const response =
       await fetch(
@@ -1473,14 +1390,14 @@ export function SchoolProvider({
 
           body:
             JSON.stringify(
-              item
+              item,
             ),
-        }
+        },
       )
 
     if (!response.ok) {
       throw new Error(
-        'Failed to create exam'
+        'Failed to create exam',
       )
     }
 
@@ -1489,12 +1406,12 @@ export function SchoolProvider({
 
   const updateExam =
     async (
-      item: Exam
+      item: Exam,
     ) => {
       const response =
         await fetch(
           `/api/exams/${encodeURIComponent(
-            item.id
+            item.id,
           )}`,
           {
             method: 'PUT',
@@ -1506,14 +1423,14 @@ export function SchoolProvider({
 
             body:
               JSON.stringify(
-                item
+                item,
               ),
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to update exam'
+          'Failed to update exam',
         )
       }
 
@@ -1522,21 +1439,21 @@ export function SchoolProvider({
 
   const deleteExam =
     async (
-      id: string
+      id: string,
     ) => {
       const response =
         await fetch(
           `/api/exams/${encodeURIComponent(
-            id
+            id,
           )}`,
           {
             method: 'DELETE',
-          }
+          },
         )
 
       if (!response.ok) {
         throw new Error(
-          'Failed to delete exam'
+          'Failed to delete exam',
         )
       }
 
@@ -1550,7 +1467,7 @@ export function SchoolProvider({
    */
   const addPayment =
     async (
-      item: Payment
+      item: Payment,
     ) => {
       const response =
         await fetch(
@@ -1565,14 +1482,22 @@ export function SchoolProvider({
 
             body:
               JSON.stringify(
-                item
+                item,
               ),
-          }
+          },
         )
 
       if (!response.ok) {
+        const error =
+          await response
+            .json()
+            .catch(
+              () => null,
+            )
+
         throw new Error(
-          'Failed to create payment'
+          error?.error ||
+            'Failed to create payment',
         )
       }
 
@@ -1586,7 +1511,7 @@ export function SchoolProvider({
    */
   const updateSchoolInfo =
     (
-      info: SchoolInfo
+      info: SchoolInfo,
     ) => {
       setData(
         (current) => ({
@@ -1594,7 +1519,7 @@ export function SchoolProvider({
 
           school:
             info,
-        })
+        }),
       )
     }
 
@@ -1607,7 +1532,7 @@ export function SchoolProvider({
     async (
       studentId: string,
       date: string,
-      status: AttendanceStatus
+      status: AttendanceStatus,
     ) => {
       const response =
         await fetch(
@@ -1626,12 +1551,20 @@ export function SchoolProvider({
                 date,
                 status,
               }),
-          }
+          },
         )
 
       if (!response.ok) {
+        const error =
+          await response
+            .json()
+            .catch(
+              () => null,
+            )
+
         throw new Error(
-          'Failed to save attendance'
+          error?.error ||
+            'Failed to save attendance',
         )
       }
 
@@ -1686,8 +1619,7 @@ export function SchoolProvider({
         data,
         role,
         currentUser,
-        loggedIn,
-      ]
+      ],
     )
 
   return (
@@ -1707,12 +1639,12 @@ export function SchoolProvider({
 export function useSchool() {
   const context =
     useContext(
-      SchoolContext
+      SchoolContext,
     )
 
   if (!context) {
     throw new Error(
-      'useSchool must be used inside SchoolProvider'
+      'useSchool must be used inside SchoolProvider',
     )
   }
 
