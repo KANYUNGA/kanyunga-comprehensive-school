@@ -20,9 +20,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { Gender, Student } from '@/lib/data'
+import { useSchool } from '@/lib/store'
 
 type StudentWithPhoto = Student & {
   photoUrl?: string
+  hasPhoto?: boolean
 }
 
 type Draft = Omit<Student, 'id'> & {
@@ -77,7 +79,9 @@ function empty(className = 'Playgroup'): Draft {
     guardianPhone: '',
     address: '',
     email: '',
-    admissionDate: new Date().toISOString().slice(0, 10),
+    admissionDate: new Date()
+      .toISOString()
+      .slice(0, 10),
     status: 'Active',
     photoUrl: '',
   }
@@ -92,6 +96,11 @@ export function StudentDialog({
   onOpenChange: (v: boolean) => void
   student: Student | null
 }) {
+  const {
+    addStudent,
+    updateStudent,
+  } = useSchool()
+
   const [draft, setDraft] = useState<Draft>(() =>
     empty('Playgroup')
   )
@@ -101,27 +110,66 @@ export function StudentDialog({
 
   useEffect(() => {
     if (student) {
-      const existing = student as StudentWithPhoto
+      const existing =
+        student as StudentWithPhoto
 
       setDraft({
-        admissionNo: safeString(existing.admissionNo),
-        firstName: safeString(existing.firstName),
-        middleName: safeString(existing.middleName),
-        lastName: safeString(existing.lastName),
-        gender: (safeString(existing.gender) || 'Male') as Gender,
-        classId: safeString(existing.classId) || 'Playgroup',
+        admissionNo: safeString(
+          existing.admissionNo
+        ),
+        firstName: safeString(
+          existing.firstName
+        ),
+        middleName: safeString(
+          existing.middleName
+        ),
+        lastName: safeString(
+          existing.lastName
+        ),
+        gender:
+          (safeString(existing.gender) ||
+            'Male') as Gender,
+
+        classId:
+          safeString(existing.classId) ||
+          'Playgroup',
+
         stream:
           safeString(existing.stream) ||
-          CLASS_STREAMS[safeString(existing.classId)]?.[0] ||
+          CLASS_STREAMS[
+            safeString(existing.classId)
+          ]?.[0] ||
           'Main',
-        dateOfBirth: safeString(existing.dateOfBirth),
-        guardianName: safeString(existing.guardianName),
-        guardianPhone: safeString(existing.guardianPhone),
-        address: safeString(existing.address),
+
+        dateOfBirth: safeString(
+          existing.dateOfBirth
+        ),
+
+        guardianName: safeString(
+          existing.guardianName
+        ),
+
+        guardianPhone: safeString(
+          existing.guardianPhone
+        ),
+
+        address: safeString(
+          existing.address
+        ),
+
         email: safeString(existing.email),
-        admissionDate: safeString(existing.admissionDate),
-        status: safeString(existing.status) || 'Active',
-        photoUrl: safeString(existing.photoUrl),
+
+        admissionDate: safeString(
+          existing.admissionDate
+        ),
+
+        status:
+          safeString(existing.status) ||
+          'Active',
+
+        photoUrl: safeString(
+          existing.photoUrl
+        ),
       })
     } else {
       setDraft(empty('Playgroup'))
@@ -130,7 +178,9 @@ export function StudentDialog({
     setError('')
   }, [student, open])
 
-  const selectedClass = safeString(draft.classId) || 'Playgroup'
+  const selectedClass =
+    safeString(draft.classId) ||
+    'Playgroup'
 
   const availableStreams =
     CLASS_STREAMS[selectedClass] ?? ['Main']
@@ -150,9 +200,7 @@ export function StudentDialog({
   ) {
     const file = event.target.files?.[0]
 
-    if (!file) {
-      return
-    }
+    if (!file) return
 
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file.')
@@ -160,17 +208,23 @@ export function StudentDialog({
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      setError('Photo must be smaller than 2 MB.')
+      setError(
+        'Photo must be smaller than 2 MB.'
+      )
       return
     }
 
     const reader = new FileReader()
 
     reader.onload = () => {
-      const result = String(reader.result ?? '')
+      const result = String(
+        reader.result ?? ''
+      )
 
       if (!result) {
-        setError('Unable to read the selected photo.')
+        setError(
+          'Unable to read the selected photo.'
+        )
         return
       }
 
@@ -179,26 +233,53 @@ export function StudentDialog({
     }
 
     reader.onerror = () => {
-      setError('Unable to read the selected photo.')
+      setError(
+        'Unable to read the selected photo.'
+      )
     }
 
     reader.readAsDataURL(file)
   }
 
   async function handleSave() {
-    const firstName = safeString(draft.firstName)
-    const middleName = safeString(draft.middleName)
-    const lastName = safeString(draft.lastName)
-    const admissionNo = safeString(draft.admissionNo)
-    const className = safeString(draft.classId)
-    const stream = safeString(draft.stream)
-    const dateOfBirth = safeString(draft.dateOfBirth)
-    const admissionDate = safeString(draft.admissionDate)
-    const guardianName = safeString(draft.guardianName)
-    const guardianPhone = safeString(draft.guardianPhone)
-    const address = safeString(draft.address)
-    const email = safeString(draft.email)
-    const photoUrl = safeString(draft.photoUrl)
+    const firstName =
+      safeString(draft.firstName)
+
+    const middleName =
+      safeString(draft.middleName)
+
+    const lastName =
+      safeString(draft.lastName)
+
+    const admissionNo =
+      safeString(draft.admissionNo)
+
+    const className =
+      safeString(draft.classId)
+
+    const stream =
+      safeString(draft.stream)
+
+    const dateOfBirth =
+      safeString(draft.dateOfBirth)
+
+    const admissionDate =
+      safeString(draft.admissionDate)
+
+    const guardianName =
+      safeString(draft.guardianName)
+
+    const guardianPhone =
+      safeString(draft.guardianPhone)
+
+    const address =
+      safeString(draft.address)
+
+    const email =
+      safeString(draft.email)
+
+    const photoUrl =
+      safeString(draft.photoUrl)
 
     if (!firstName) {
       setError('First name is required.')
@@ -221,10 +302,13 @@ export function StudentDialog({
     try {
       const generatedAdmissionNo =
         admissionNo ||
-        `KCS-${Math.floor(2000 + Math.random() * 8000)}`
+        `KCS-${Math.floor(
+          2000 + Math.random() * 8000
+        )}`
 
       const body = {
-        admissionNo: generatedAdmissionNo,
+        admissionNo:
+          generatedAdmissionNo,
 
         firstName,
         middleName,
@@ -235,58 +319,45 @@ export function StudentDialog({
         classId: className,
         className,
 
-        stream: stream || CLASS_STREAMS[className]?.[0] || 'Main',
+        stream:
+          stream ||
+          CLASS_STREAMS[className]?.[0] ||
+          'Main',
 
-        dateOfBirth: dateOfBirth || null,
+        dateOfBirth:
+          dateOfBirth || null,
 
         guardianName,
         guardianPhone,
         address,
         email,
 
-        admissionDate: admissionDate || null,
+        admissionDate:
+          admissionDate || null,
 
-        status: safeString(draft.status) || 'Active',
+        status:
+          safeString(draft.status) ||
+          'Active',
 
-        photoUrl: photoUrl || null,
+        photoUrl:
+          photoUrl || null,
       }
 
-      const url = student
-        ? `/api/students/${encodeURIComponent(String(student.id))}`
-        : '/api/students'
-
-      const response = await fetch(url, {
-        method: student ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      })
-
-      let result: any = null
-
-      try {
-        result = await response.json()
-      } catch {
-        result = null
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          result?.error ||
-            `Failed to ${student ? 'update' : 'register'} student.`
+      if (student) {
+        await updateStudent(
+          student.id,
+          body as any
         )
+      } else {
+        await addStudent(body as any)
       }
 
       onOpenChange(false)
-
-      /*
-       * Reload the page so the newly inserted/updated
-       * Neon record and passport photo appear immediately.
-       */
-      window.location.reload()
     } catch (err) {
-      console.error('Student save error:', err)
+      console.error(
+        'Student save error:',
+        err
+      )
 
       setError(
         err instanceof Error
@@ -318,7 +389,6 @@ export function StudentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* PASSPORT PHOTO */}
         <div className="flex flex-col items-center gap-3 py-2">
           <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border bg-muted">
             {draft.photoUrl ? (
@@ -329,8 +399,12 @@ export function StudentDialog({
               />
             ) : (
               <span className="text-3xl font-semibold text-muted-foreground">
-                {safeString(draft.firstName).charAt(0) || 'L'}
-                {safeString(draft.lastName).charAt(0)}
+                {safeString(
+                  draft.firstName
+                ).charAt(0) || 'L'}
+                {safeString(
+                  draft.lastName
+                ).charAt(0)}
               </span>
             )}
           </div>
@@ -360,13 +434,17 @@ export function StudentDialog({
           </div>
         </div>
 
-        {/* STUDENT DETAILS */}
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <Field label="First name">
             <Input
-              value={safeString(draft.firstName)}
+              value={safeString(
+                draft.firstName
+              )}
               onChange={(event) =>
-                setField('firstName', event.target.value)
+                setField(
+                  'firstName',
+                  event.target.value
+                )
               }
               placeholder="First name"
             />
@@ -374,9 +452,14 @@ export function StudentDialog({
 
           <Field label="Middle name">
             <Input
-              value={safeString(draft.middleName)}
+              value={safeString(
+                draft.middleName
+              )}
               onChange={(event) =>
-                setField('middleName', event.target.value)
+                setField(
+                  'middleName',
+                  event.target.value
+                )
               }
               placeholder="Middle name"
             />
@@ -384,9 +467,14 @@ export function StudentDialog({
 
           <Field label="Last name">
             <Input
-              value={safeString(draft.lastName)}
+              value={safeString(
+                draft.lastName
+              )}
               onChange={(event) =>
-                setField('lastName', event.target.value)
+                setField(
+                  'lastName',
+                  event.target.value
+                )
               }
               placeholder="Last name"
             />
@@ -394,9 +482,14 @@ export function StudentDialog({
 
           <Field label="Admission No.">
             <Input
-              value={safeString(draft.admissionNo)}
+              value={safeString(
+                draft.admissionNo
+              )}
               onChange={(event) =>
-                setField('admissionNo', event.target.value)
+                setField(
+                  'admissionNo',
+                  event.target.value
+                )
               }
               placeholder="Auto-generated if blank"
             />
@@ -404,9 +497,14 @@ export function StudentDialog({
 
           <Field label="Gender">
             <Select
-              value={draft.gender || 'Male'}
+              value={
+                draft.gender || 'Male'
+              }
               onValueChange={(value) =>
-                setField('gender', value as Gender)
+                setField(
+                  'gender',
+                  value as Gender
+                )
               }
             >
               <SelectTrigger>
@@ -430,7 +528,8 @@ export function StudentDialog({
               value={selectedClass}
               onValueChange={(value) => {
                 const streams =
-                  CLASS_STREAMS[value] ?? ['Main']
+                  CLASS_STREAMS[value] ??
+                  ['Main']
 
                 setDraft((current) => ({
                   ...current,
@@ -444,14 +543,16 @@ export function StudentDialog({
               </SelectTrigger>
 
               <SelectContent>
-                {SCHOOL_CLASSES.map((className) => (
-                  <SelectItem
-                    key={className}
-                    value={className}
-                  >
-                    {className}
-                  </SelectItem>
-                ))}
+                {SCHOOL_CLASSES.map(
+                  (className) => (
+                    <SelectItem
+                      key={className}
+                      value={className}
+                    >
+                      {className}
+                    </SelectItem>
+                  )
+                )}
               </SelectContent>
             </Select>
           </Field>
@@ -459,11 +560,16 @@ export function StudentDialog({
           <Field label="Stream">
             <Select
               value={
-                safeString(draft.stream) ||
+                safeString(
+                  draft.stream
+                ) ||
                 availableStreams[0]
               }
               onValueChange={(value) =>
-                setField('stream', value)
+                setField(
+                  'stream',
+                  value
+                )
               }
             >
               <SelectTrigger>
@@ -471,14 +577,16 @@ export function StudentDialog({
               </SelectTrigger>
 
               <SelectContent>
-                {availableStreams.map((stream) => (
-                  <SelectItem
-                    key={stream}
-                    value={stream}
-                  >
-                    {stream}
-                  </SelectItem>
-                ))}
+                {availableStreams.map(
+                  (stream) => (
+                    <SelectItem
+                      key={stream}
+                      value={stream}
+                    >
+                      {stream}
+                    </SelectItem>
+                  )
+                )}
               </SelectContent>
             </Select>
           </Field>
@@ -486,7 +594,9 @@ export function StudentDialog({
           <Field label="Date of birth">
             <Input
               type="date"
-              value={safeString(draft.dateOfBirth)}
+              value={safeString(
+                draft.dateOfBirth
+              )}
               onChange={(event) =>
                 setField(
                   'dateOfBirth',
@@ -499,7 +609,9 @@ export function StudentDialog({
           <Field label="Admission date">
             <Input
               type="date"
-              value={safeString(draft.admissionDate)}
+              value={safeString(
+                draft.admissionDate
+              )}
               onChange={(event) =>
                 setField(
                   'admissionDate',
@@ -511,7 +623,9 @@ export function StudentDialog({
 
           <Field label="Guardian name">
             <Input
-              value={safeString(draft.guardianName)}
+              value={safeString(
+                draft.guardianName
+              )}
               onChange={(event) =>
                 setField(
                   'guardianName',
@@ -524,7 +638,9 @@ export function StudentDialog({
 
           <Field label="Guardian phone">
             <Input
-              value={safeString(draft.guardianPhone)}
+              value={safeString(
+                draft.guardianPhone
+              )}
               onChange={(event) =>
                 setField(
                   'guardianPhone',
@@ -538,7 +654,9 @@ export function StudentDialog({
           <div className="sm:col-span-2">
             <Field label="Address">
               <Input
-                value={safeString(draft.address)}
+                value={safeString(
+                  draft.address
+                )}
                 onChange={(event) =>
                   setField(
                     'address',
@@ -554,7 +672,9 @@ export function StudentDialog({
             <Field label="Email">
               <Input
                 type="email"
-                value={safeString(draft.email)}
+                value={safeString(
+                  draft.email
+                )}
                 onChange={(event) =>
                   setField(
                     'email',
@@ -579,7 +699,9 @@ export function StudentDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() =>
+              onOpenChange(false)
+            }
             disabled={saving}
           >
             Cancel
