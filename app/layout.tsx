@@ -21,8 +21,10 @@ export const metadata: Metadata = {
   description:
     'Secure school management system for Kanyunga Comprehensive School — students, teachers, attendance, examinations, and fees.',
   generator: 'v0.app',
+  verification: {
+    google: '9nJuJYFicVJstjIufCDpiiP_ze4ha7tFQRm7fvNRfnY',
+  },
 }
-
 export const viewport: Viewport = {
   colorScheme: 'light',
   themeColor: '#2563eb',
