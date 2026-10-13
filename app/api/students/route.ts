@@ -36,9 +36,7 @@ function mapStudent(row: any) {
 
     guardianName: safeString(row.parent_name),
     guardianPhone: safeString(row.parent_phone),
-
     address: safeString(row.address),
-    email: safeString(row.email),
 
     admissionDate: formatDate(row.admission_date),
     status: safeString(row.status) || "Active",
@@ -64,7 +62,6 @@ export async function GET() {
         parent_name,
         parent_phone,
         address,
-        email,
         admission_date,
         status,
         CASE
@@ -82,7 +79,6 @@ export async function GET() {
 
     return Response.json(students.map(mapStudent))
   } catch (error) {
-    // Full error stays in the server logs, not the public response.
     console.error(
       "Failed to fetch students:",
       error instanceof Error
@@ -129,7 +125,6 @@ export async function POST(request: Request) {
     const guardianName = safeString(body.guardianName)
     const guardianPhone = safeString(body.guardianPhone)
     const address = safeString(body.address)
-    const email = safeString(body.email)
 
     const admissionDate =
       safeString(body.admissionDate) || null
@@ -197,7 +192,6 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
-        email,
         admission_date,
         status,
         photo_url
@@ -214,7 +208,6 @@ export async function POST(request: Request) {
         ${guardianName},
         ${guardianPhone},
         ${address},
-        ${email},
         ${admissionDate},
         ${status},
         ${photoUrl}
@@ -232,7 +225,6 @@ export async function POST(request: Request) {
         parent_name,
         parent_phone,
         address,
-        email,
         admission_date,
         status,
         CASE
