@@ -1,3 +1,4 @@
+
 import { getDb } from "@/lib/db"
 import { requireAdmin } from "@/lib/server-auth"
 
@@ -29,7 +30,6 @@ function mapStudent(row: any) {
 
     classId: safeString(row.class_name),
     className: safeString(row.class_name),
-
     stream: safeString(row.stream),
 
     dateOfBirth: formatDate(row.date_of_birth),
@@ -41,11 +41,9 @@ function mapStudent(row: any) {
     email: safeString(row.email),
 
     admissionDate: formatDate(row.admission_date),
-
     status: safeString(row.status) || "Active",
 
-    // IMPORTANT:
-    // Do not send the Base64 photo here.
+    // Do not send the full passport photo with every student.
     hasPhoto: Boolean(row.has_photo),
   }
 }
@@ -69,14 +67,12 @@ export async function GET() {
         email,
         admission_date,
         status,
-
         CASE
           WHEN photo_url IS NOT NULL
             AND LENGTH(TRIM(photo_url)) > 0
           THEN true
           ELSE false
         END AS has_photo
-
       FROM students
       ORDER BY
         first_name ASC,
@@ -86,15 +82,21 @@ export async function GET() {
 
     return Response.json(students.map(mapStudent))
   } catch (error) {
-    console.error("Failed to fetch students:", error)
+    // Full error stays in the server logs, not the public response.
+    console.error(
+      "Failed to fetch students:",
+      error instanceof Error
+        ? {
+            message: error.message,
+            name: error.name,
+            cause: error.cause,
+          }
+        : error
+    )
 
     return Response.json(
-      {
-        error: "Failed to fetch students",
-      },
-      {
-        status: 500,
-      }
+      { error: "Failed to fetch students" },
+      { status: 500 }
     )
   }
 }
@@ -114,6 +116,7 @@ export async function POST(request: Request) {
     const middleName = safeString(body.middleName)
     const lastName = safeString(body.lastName)
     const gender = safeString(body.gender) || "Male"
+
     const className =
       safeString(body.className) ||
       safeString(body.classId)
@@ -123,68 +126,44 @@ export async function POST(request: Request) {
     const dateOfBirth =
       safeString(body.dateOfBirth) || null
 
-    const guardianName =
-      safeString(body.guardianName)
-
-    const guardianPhone =
-      safeString(body.guardianPhone)
-
-    const address =
-      safeString(body.address)
-
-    const email =
-      safeString(body.email)
+    const guardianName = safeString(body.guardianName)
+    const guardianPhone = safeString(body.guardianPhone)
+    const address = safeString(body.address)
+    const email = safeString(body.email)
 
     const admissionDate =
       safeString(body.admissionDate) || null
 
-    const status =
-      safeString(body.status) || "Active"
+    const status = safeString(body.status) || "Active"
 
     const photoUrl =
       safeString(body.photoUrl) || null
 
     if (!admissionNo) {
       return Response.json(
-        {
-          error: "Admission number is required.",
-        },
-        {
-          status: 400,
-        }
+        { error: "Admission number is required." },
+        { status: 400 }
       )
     }
 
     if (!firstName) {
       return Response.json(
-        {
-          error: "First name is required.",
-        },
-        {
-          status: 400,
-        }
+        { error: "First name is required." },
+        { status: 400 }
       )
     }
 
     if (!lastName) {
       return Response.json(
-        {
-          error: "Last name is required.",
-        },
-        {
-          status: 400,
-        }
+        { error: "Last name is required." },
+        { status: 400 }
       )
     }
 
     if (!className) {
       return Response.json(
-        {
-          error: "Class is required.",
-        },
-        {
-          status: 400,
-        }
+        { error: "Class is required." },
+        { status: 400 }
       )
     }
 
@@ -201,9 +180,7 @@ export async function POST(request: Request) {
         {
           error: `Admission number ${admissionNo} already exists.`,
         },
-        {
-          status: 409,
-        }
+        { status: 409 }
       )
     }
 
@@ -266,22 +243,24 @@ export async function POST(request: Request) {
         END AS has_photo
     `
 
-    return Response.json(
-      mapStudent(inserted[0]),
-      {
-        status: 201,
-      }
-    )
+    return Response.json(mapStudent(inserted[0]), {
+      status: 201,
+    })
   } catch (error) {
-    console.error("Failed to add student:", error)
+    console.error(
+      "Failed to add student:",
+      error instanceof Error
+        ? {
+            message: error.message,
+            name: error.name,
+            cause: error.cause,
+          }
+        : error
+    )
 
     return Response.json(
-      {
-        error: "Failed to add student.",
-      },
-      {
-        status: 500,
-      }
+      { error: "Failed to add student." },
+      { status: 500 }
     )
   }
 }
