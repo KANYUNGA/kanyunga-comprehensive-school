@@ -1,27 +1,20 @@
+
 import { getDb } from "@/lib/db"
 
 const sql = getDb()
 
 export async function GET(
   _request: Request,
-  {
-    params,
-  }: {
-    params: Promise<{ id: string }>
-  }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params
-    const id = Number(resolvedParams.id)
+    const { id: rawId } = await params
+    const id = Number(rawId)
 
     if (!Number.isInteger(id) || id <= 0) {
       return Response.json(
-        {
-          error: "Invalid student ID.",
-        },
-        {
-          status: 400,
-        }
+        { error: "Invalid student ID." },
+        { status: 400 }
       )
     }
 
@@ -34,40 +27,51 @@ export async function GET(
 
     if (rows.length === 0) {
       return Response.json(
-        {
-          error: "Student not found.",
-        },
-        {
-          status: 404,
-        }
+        { error: "Student not found." },
+        { status: 404 }
       )
     }
 
-    const photoUrl = String(
-      rows[0].photo_url ?? ""
-    ).trim()
+    const photo = String(rows[0].photo_url ?? "").trim()
 
-    if (!photoUrl) {
-      return Response.json({
-        success: true,
-        photoUrl: "",
+    if (!photo) {
+      return new Response(null, { status: 404 })
+    }
+
+    // Support photos saved as data:image/...;base64,...
+    const match = photo.match(
+      /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/
+    )
+
+    if (match) {
+      const contentType = match[1]
+      const imageBytes = Buffer.from(match[2], "base64")
+
+      return new Response(imageBytes, {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
       })
     }
 
-    return Response.json({
-      success: true,
-      photoUrl,
-    })
+    // Also support an existing externally hosted image URL.
+    if (/^https?:\/\//i.test(photo)) {
+      return Response.redirect(photo)
+    }
+
+    return Response.json(
+      { error: "The stored photo format is not supported." },
+      { status: 415 }
+    )
   } catch (error) {
     console.error("Failed to fetch student photo:", error)
 
     return Response.json(
-      {
-        error: "Failed to fetch student photo.",
-      },
-      {
-        status: 500,
-      }
+      { error: "Failed to fetch student photo." },
+      { status: 500 }
     )
   }
 }
+
